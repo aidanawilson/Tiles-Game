@@ -1,6 +1,9 @@
 export const TILE_COLORS = ["red", "orange", "yellow", "green", "blue", "violet"] as const;
 export type TileColor = (typeof TILE_COLORS)[number];
 
+export const PLAYER_COLORS = ["yellow", "blue", "red", "green", "pink"] as const;
+export type PlayerColor = (typeof PLAYER_COLORS)[number];
+
 export type GamePhase =
   | "lobby"
   | "countdown"
@@ -29,6 +32,7 @@ export interface PowerupState {
 export interface PlayerState {
   id: string;
   name: string;
+  color: PlayerColor;
   tileId: number;
   alive: boolean;
   connected: boolean;
@@ -62,6 +66,7 @@ export interface GameState {
   players: PlayerState[];
   powerups: PowerupState[];
   selectorId: string | null;
+  selectorCandidates: string[];
   selectedColor: TileColor | null;
   phaseEndsAt: number | null;
   message: string;

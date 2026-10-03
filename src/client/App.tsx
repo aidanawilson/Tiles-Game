@@ -1,380 +1,110 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { GameState, TileColor } from "../shared/types";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import type { GameState, PlayerColor, PlayerState, TileColor } from "../shared/types";
 import { TILE_COLORS } from "../shared/types";
 import { GameCanvas } from "./game/GameCanvas";
 import { RoomSocket } from "./network/socket";
 
-const COLOR_LABELS: Record<TileColor, string> = {
-  red: "Red",
-  orange: "Orange",
-  yellow: "Yellow",
-  green: "Green",
-  blue: "Blue",
-  violet: "Violet",
-};
+const TILE_HEX: Record<TileColor,string> = { red:"#e44545", orange:"#ef7f35", yellow:"#e6c94c", green:"#4eba63", blue:"#4e88d9", violet:"#8656c8" };
+const PLAYER_HEX: Record<PlayerColor,string> = { yellow:"#f4c63d", blue:"#54d8ff", red:"#ff625f", green:"#69dc72", pink:"#ff77c8" };
 
-function currentRoomCode(): string | null {
-  const match = location.pathname.match(/^\/room\/([A-Z0-9]{4})$/i);
-  return match ? match[1].toUpperCase() : null;
+function currentRoomCode() { const m=location.pathname.match(/^\/room\/([A-Z0-9]{4})$/i); return m ? m[1].toUpperCase() : null; }
+function isTouchDevice() { return navigator.maxTouchPoints > 0 || matchMedia("(pointer: coarse)").matches; }
+function isIOSBrowser() { return /iPad|iPhone|iPod/.test(navigator.userAgent); }
+function isStandalone() { return matchMedia?.("(display-mode: standalone)").matches || Boolean((navigator as Navigator & {standalone?:boolean}).standalone); }
+
+function AudioController() {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [muted,setMuted] = useState(() => localStorage.getItem("tiles:music:muted") === "yes");
+  useEffect(() => {
+    const audio = new Audio("/audio/retro-arcade-theme.mp3");
+    audio.loop=true; audio.volume=.34; audio.muted=muted; audioRef.current=audio;
+    const unlock=()=>{ void audio.play().catch(()=>undefined); window.removeEventListener("pointerdown",unlock); window.removeEventListener("keydown",unlock); };
+    window.addEventListener("pointerdown",unlock,{once:true}); window.addEventListener("keydown",unlock,{once:true});
+    return()=>{audio.pause(); window.removeEventListener("pointerdown",unlock); window.removeEventListener("keydown",unlock);};
+  },[]);
+  useEffect(()=>{ if(audioRef.current) audioRef.current.muted=muted; localStorage.setItem("tiles:music:muted",muted?"yes":"no"); },[muted]);
+  return <button className="sound-toggle" type="button" onClick={()=>setMuted(v=>!v)} aria-label={muted?"Turn music on":"Mute music"}>{muted?"♪×":"♪"}</button>;
 }
 
-function isIOSBrowser(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-}
-
-function isStandalone(): boolean {
-  return window.matchMedia?.("(display-mode: standalone)").matches ||
-    Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
-}
-
-function Intro({ onDone }: { onDone: () => void }) {
-  const [page, setPage] = useState(0);
-  const [showInstall, setShowInstall] = useState(false);
-  const showIPhoneTip = isIOSBrowser() && !isStandalone();
-
-  return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="How to play Tiles">
-      <div className="modal-card">
-        {page === 0 ? (
-          <>
-            <div className="eyebrow">HOW TO PLAY</div>
-            <h1>Move. Survive. Choose.</h1>
-            <div className="tutorial-grid">
-              <div><b>1</b><span>Tap any reachable hex. Your character runs there automatically.</span></div>
-              <div><b>2</b><span>After 7 seconds, movement locks and one player is chosen.</span></div>
-              <div><b>3</b><span>That player chooses a color. Every tile of that color drops.</span></div>
-            </div>
-            <div className="modal-actions">
-              <button className="secondary" onClick={onDone}>Skip</button>
-              <button className="primary" onClick={() => setPage(1)}>Next</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="eyebrow">POWER & POSITION</div>
-            <h1>Race for power-ups.</h1>
-            <p>Power-ups sit directly on the board. Whoever physically reaches the hex first collects it. You can hold one at a time.</p>
-            <div className="power-row">
-              <span className="power-pill">S · Speed</span>
-              <span className="power-pill rare">P · Phase Shift</span>
-            </div>
-            <p className="muted">Phase Shift can save you after the doomed color is revealed — but you only have 1.15 seconds.</p>
-            <div className="modal-actions">
-              {showIPhoneTip && (
-                <button className="secondary" onClick={() => setShowInstall((shown) => !shown)}>
-                  {showInstall ? "Hide mobile tip" : "Show me the mobile tip"}
-                </button>
-              )}
-              <button className="primary" onClick={onDone}>I’m ready to play</button>
-            </div>
-            {showInstall && showIPhoneTip && (
-              <div className="install-tip">
-                <b>iPhone tip:</b> Tiles works directly in Safari. For more game space, tap Share → Add to Home Screen, then open Tiles from your Home Screen. This is optional.
-              </div>
-            )}
-          </>
-        )}
+function Intro({onDone}:{onDone:()=>void}) {
+  const [page,setPage]=useState(0); const [showInstall,setShowInstall]=useState(false); const touch=isTouchDevice(); const install=isIOSBrowser()&&!isStandalone();
+  return <div className="tutorial-backdrop" role="dialog" aria-modal="true">
+    <div className="tutorial-card">
+      <div className="tutorial-scroll">
+        <div className="pixel-kicker">HOW TO PLAY</div>
+        {page===0 ? <>
+          <h2>MOVE. SURVIVE. CHOOSE.</h2>
+          <div className="tutorial-steps">
+            <div><b>01</b><span>{touch?"Tap":"Click"} any reachable hex. Your character runs there automatically.</span></div>
+            <div><b>02</b><span>When movement locks, the selector wheel picks a surviving player.</span></div>
+            <div><b>03</b><span>That player chooses a color. Every tile of that color cracks and falls.</span></div>
+          </div>
+        </> : <>
+          <h2>POWER UPS = ONE SLOT.</h2>
+          <p>Race across the board to collect an item. The first character to physically reach it gets it. You can only hold one.</p>
+          <div className="tutorial-power-grid"><span>⚡ SPEED</span><span>✦ PHASE SHIFT</span></div>
+          <p className="tutorial-note">Phase Shift can save you after the doomed color appears, but you only have <strong>1.15 seconds</strong>. {touch?"Tap the power-up button":"Click the power-up button"} before the floor drops.</p>
+          {install && <button className="text-button" onClick={()=>setShowInstall(v=>!v)}>{showInstall?"Hide iPhone tip":"Show me how to use full-screen mode"}</button>}
+          {showInstall && install && <div className="install-tip">Safari: tap <b>Share</b> → <b>Add to Home Screen</b>. Tiles then opens like a web app with more room for the arena. Totally optional.</div>}
+        </>}
+      </div>
+      <div className="tutorial-actions">
+        {page===0 ? <><button className="arcade-button ghost" onClick={onDone}>SKIP</button><button className="arcade-button" onClick={()=>setPage(1)}>NEXT</button></>
+        : <><button className="arcade-button ghost" onClick={()=>setPage(0)}>BACK</button><button className="arcade-button" onClick={onDone}>I'M READY</button></>}
       </div>
     </div>
-  );
+  </div>;
 }
+
+function Brand() { return <div className="tiles-logo" aria-label="Tiles"><span>T</span><span>I</span><span>L</span><span>E</span><span>S</span></div>; }
 
 function Landing() {
-  const [name, setName] = useState(() => localStorage.getItem("tiles:name") || "");
-  const [code, setCode] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState<"create" | "join" | null>(null);
+  const [name,setName]=useState(()=>localStorage.getItem("tiles:name")||""); const [code,setCode]=useState(""); const [error,setError]=useState(""); const [busy,setBusy]=useState<"create"|"join"|null>(null); const [resumeRoom,setResumeRoom]=useState(()=>localStorage.getItem("tiles:lastRoom")||"");
+  const saveName=()=>{const clean=name.trim().slice(0,16); if(!clean) throw new Error("Enter a player name first."); localStorage.setItem("tiles:name",clean); return clean;};
+  async function createRoom(){try{setBusy("create");setError("");saveName();const r=await fetch("/api/rooms",{method:"POST"});const d=await r.json() as {roomCode?:string;error?:string};if(!r.ok||!d.roomCode)throw new Error(d.error||"Could not create room");location.href=`/room/${d.roomCode}`;}catch(e){setError(e instanceof Error?e.message:"Something went wrong");setBusy(null);}}
+  async function joinRoom(){try{setBusy("join");setError("");saveName();const c=code.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,4);if(c.length!==4)throw new Error("Enter the 4-character room code.");const r=await fetch(`/api/rooms/${c}`);if(!r.ok)throw new Error("That room does not exist.");location.href=`/room/${c}`;}catch(e){setError(e instanceof Error?e.message:"Something went wrong");setBusy(null);}}
+  async function resume(){if(!resumeRoom)return;try{setBusy("join");const r=await fetch(`/api/rooms/${resumeRoom}`);if(!r.ok)throw new Error("Your previous room has expired.");location.href=`/room/${resumeRoom}`;}catch(e){localStorage.removeItem("tiles:lastRoom");setResumeRoom("");setError(e instanceof Error?e.message:"Previous room unavailable");setBusy(null);}}
+  return <main className="landing-screen"><AudioController/><section className="landing-panel"><Brand/><div className="landing-rule"/><p className="landing-tagline">MOVE FAST · STAY UP · DROP THE FLOOR</p><label className="arcade-label">PLAYER NAME<input value={name} onChange={(e:any)=>setName(e.target.value)} maxLength={16} placeholder="PLAYER 1" /></label><button className="big-action" onClick={createRoom} disabled={busy!==null}>{busy==="create"?"CREATING...":"CREATE GROUP"}</button><div className="or-line"><span>OR JOIN WITH CODE</span></div><div className="code-row"><input value={code} onChange={(e:any)=>setCode(e.target.value.toUpperCase())} onKeyDown={(e:any)=>{if(e.key==="Enter"&&!busy)void joinRoom();}} maxLength={4} placeholder="K7PX"/><button className="arcade-button" onClick={joinRoom} disabled={busy!==null}>{busy==="join"?"JOINING...":"JOIN"}</button></div>{error&&<p className="landing-error">{error}</p>}{resumeRoom&&<button className="resume-button" onClick={resume} disabled={busy!==null}>RECONNECT TO ROOM {resumeRoom}</button>}<div className="landing-rule"/><p className="landing-foot">2–5 PLAYERS · NO ACCOUNTS · ROOM CODE MULTIPLAYER</p><a className="apogee-link" href="https://apogeelab.org" target="_blank" rel="noreferrer">APOGEE LAB ↗</a></section></main>;
+}
 
-  const saveName = () => {
-    const clean = name.trim().slice(0, 16);
-    if (!clean) throw new Error("Enter a display name first.");
-    localStorage.setItem("tiles:name", clean);
-    return clean;
-  };
+function SelectorWheel({state}:{state:GameState}) {
+  const candidates=state.selectorCandidates.map(id=>state.players.find(p=>p.id===id)).filter(Boolean) as PlayerState[];
+  const selector=state.players.find(p=>p.id===state.selectorId);
+  if(!candidates.length||!selector)return null;
+  const segment=360/candidates.length;
+  const gradient=candidates.map((p,i)=>`${PLAYER_HEX[p.color]} ${i*segment}deg ${(i+1)*segment}deg`).join(",");
+  const targetIndex=Math.max(0,candidates.findIndex(p=>p.id===selector.id));
+  const finalRotation=1440 + (360-(targetIndex*segment+segment/2));
+  return <div className="wheel-overlay"><div className="wheel-title">SELECTOR</div><div className="wheel-pointer">▼</div><div className="selector-wheel" style={{background:`conic-gradient(from -90deg, ${gradient})`,"--wheel-final":`${finalRotation}deg`} as CSSProperties}></div></div>;
+}
 
-  async function createRoom() {
-    try {
-      setBusy("create");
-      setError("");
-      saveName();
-      const response = await fetch("/api/rooms", { method: "POST" });
-      const data = await response.json() as { roomCode?: string; error?: string };
-      if (!response.ok || !data.roomCode) throw new Error(data.error || "Could not create room");
-      location.href = `/room/${data.roomCode}`;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-      setBusy(null);
-    }
-  }
-
-  async function joinRoom() {
-    try {
-      setBusy("join");
-      setError("");
-      saveName();
-      const cleanCode = code.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
-      if (cleanCode.length !== 4) throw new Error("Enter the 4-character room code.");
-
-      const response = await fetch(`/api/rooms/${cleanCode}`);
-      if (!response.ok) throw new Error("That room does not exist.");
-      location.href = `/room/${cleanCode}`;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-      setBusy(null);
-    }
-  }
-
-  return (
-    <main className="landing-shell">
-      <div className="brand-lockup">
-        <img className="brand-mark" src="/icons/icon.svg" alt="" />
-        <span>TILES</span>
+function Room({roomCode}:{roomCode:string}) {
+  const name=localStorage.getItem("tiles:name")||"Player"; localStorage.setItem("tiles:lastRoom",roomCode); const socket=useMemo(()=>new RoomSocket(roomCode,name),[roomCode,name]);
+  const [state,setState]=useState<GameState|null>(null); const [myId,setMyId]=useState<string|null>(null); const [error,setError]=useState(""); const [fatal,setFatal]=useState(""); const [connection,setConnection]=useState<"connecting"|"connected"|"reconnecting"|"closed">("connecting"); const [serverOffset,setServerOffset]=useState(0); const [,tick]=useState(0);
+  useEffect(()=>{let cancelled=false;const a=socket.onState((next,t)=>{setState(next);setMyId(socket.playerId);setServerOffset(t-Date.now());setError("");});const b=socket.onError(m=>{if(m==="This room is full"||m==="A match is already in progress"){setFatal(m);socket.close();}else setError(m);});const c=socket.onConnection(setConnection);const timer=setInterval(()=>tick(n=>n+1),100);void(async()=>{try{const r=await fetch(`/api/rooms/${roomCode}`);if(!r.ok)throw new Error("This room does not exist or has expired.");if(!cancelled)socket.connect();}catch(e){if(!cancelled)setFatal(e instanceof Error?e.message:"Could not open room");}})();return()=>{cancelled=true;a();b();c();clearInterval(timer);socket.close();};},[roomCode,socket]);
+  const move=useCallback((tileId:number)=>socket.send({type:"move",tileId}),[socket]);
+  if(fatal)return <main className="loading-screen"><Brand/><p>{fatal}</p><a href="/" className="arcade-button">BACK</a></main>;
+  if(!state)return <main className="loading-screen"><Brand/><p>{error||`CONNECTING TO ${roomCode}...`}</p></main>;
+  const me=state.players.find(p=>p.id===myId)||null; const connected=state.players.filter(p=>p.connected); const selector=state.players.find(p=>p.id===state.selectorId); const canStart=connected.length>=2&&connected.every(p=>p.ready||p.host);
+  const remaining=state.phaseEndsAt?Math.max(0,state.phaseEndsAt-(Date.now()+serverOffset)):0; const countdown=Math.max(1,Math.ceil(remaining/1000));
+  const choose=(color:TileColor)=>socket.send({type:"choose-color",color}); const usePower=()=>socket.send({type:"use-powerup"}); const ready=()=>socket.send({type:"ready",ready:!me?.ready}); const start=()=>socket.send({type:"start-game"});
+  async function copyInvite(){const invite=`${location.origin}/room/${roomCode}`;try{await navigator.clipboard.writeText(invite);setError("INVITE COPIED");setTimeout(()=>setError(""),1400);}catch{setError(invite);}}
+  return <main className="game-screen"><AudioController/><div className="rotate-hint">↻ LANDSCAPE IS RECOMMENDED FOR THE BEST VIEW</div><header className="arcade-header"><div className="header-room"><small>ROOM</small><strong>{roomCode}</strong></div><Brand/><div className="header-round"><small>ROUND</small><strong>{Math.max(1,state.round)}</strong></div></header>{connection==="reconnecting"&&<div className="connection-strip">RECONNECTING TO YOUR PLAYER...</div>}
+    <section className="game-grid">
+      <aside className="arcade-panel power-panel"><div className="panel-heading">POWER UP <span>1 SLOT</span></div>{me?.powerup?<button className={`power-card ${me.powerup}`} onClick={usePower}><img src="/assets/powerups.png" alt=""/><b>{me.powerup==="phase"?"PHASE SHIFT":"SPEED"}</b><small>{me.powerup==="phase"?"TAP DURING DROP":"TAP TO BOOST"}</small></button>:<div className="empty-slot"><div>+</div><span>EMPTY</span></div>}<p>RUN OVER AN ITEM TO COLLECT IT.</p></aside>
+      <div className="arena-frame"><GameCanvas state={state} myPlayerId={myId} serverOffset={serverOffset} onTileClick={move}/>
+        {state.phase==="countdown"&&<div className="round-overlay"><b>{countdown}</b><span>GET READY</span></div>}
+        {state.phase==="selector-wheel"&&<SelectorWheel state={state}/>} 
+        {state.phase==="selector-choice"&&me?.id===state.selectorId&&<div className="color-popup"><div className="popup-kicker">YOU CONTROL THE FLOOR</div><h2>CHOOSE A COLOR TO DROP</h2><div className="color-grid">{TILE_COLORS.map(c=><button key={c} onClick={()=>choose(c)} style={{"--tile-color":TILE_HEX[c]} as CSSProperties}><span/><b>{c.toUpperCase()}</b></button>)}</div></div>}
+        {state.phase==="selector-choice"&&me?.id!==state.selectorId&&<div className="waiting-overlay"><strong style={{color:selector?PLAYER_HEX[selector.color]:undefined}}>{selector?.color.toUpperCase()||"PLAYER"}</strong><span>IS CHOOSING...</span></div>}
+        {state.phase==="reveal"&&<div className="drop-callout" style={{borderColor:state.selectedColor?TILE_HEX[state.selectedColor]:undefined}}>{state.selectedColor?.toUpperCase()} DROPS!</div>}
+        {state.phase==="results"&&<div className="result-callout">{state.message.toUpperCase()}</div>}
+        {state.phase==="game-over"&&<div className="winner-overlay"><span>MATCH OVER</span><strong>{state.message.toUpperCase()}</strong>{me?.host&&<button className="arcade-button" onClick={start}>REMATCH</button>}</div>}
+        {!me?.alive&&!["lobby","game-over"].includes(state.phase)&&<div className="spectator-badge">SPECTATING</div>}
       </div>
-      <h1 className="hero-title">Stay off the color that drops.</h1>
-      <p className="hero-copy">A fast 2–5 player browser game built for phones, laptops, and people sitting around yelling at each other.</p>
-      <div className="landing-card">
-        <label>
-          Display name
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            maxLength={16}
-            autoComplete="nickname"
-            placeholder="Aidan"
-          />
-        </label>
-        <button className="primary" onClick={createRoom} disabled={busy !== null}>
-          {busy === "create" ? "Creating…" : "Create room"}
-        </button>
-        <div className="divider"><span>or join</span></div>
-        <div className="join-row">
-          <input
-            value={code}
-            onChange={(event) => setCode(event.target.value.toUpperCase())}
-            onKeyDown={(event) => { if (event.key === "Enter" && !busy) void joinRoom(); }}
-            maxLength={4}
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            placeholder="K7PX"
-            aria-label="Room code"
-          />
-          <button className="secondary" onClick={joinRoom} disabled={busy !== null}>
-            {busy === "join" ? "Joining…" : "Join"}
-          </button>
-        </div>
-        {error && <p className="error">{error}</p>}
-      </div>
-      <a className="apogee-link" href="https://apogeelab.org" target="_blank" rel="noreferrer">An Apogee Lab project ↗</a>
-    </main>
-  );
+      <aside className="arcade-panel players-panel"><div className="panel-heading">PLAYERS <span>{connected.length}/5</span></div><div className="player-list">{state.players.map(p=><div key={p.id} className={`player-card ${!p.alive?"dead":""} ${!p.connected?"offline":""}`}><img src={`/assets/characters/thumbs/${p.color}.png`} alt=""/><span className="color-chip" style={{background:PLAYER_HEX[p.color]}}/><div><b>{p.name}{p.id===myId?" · YOU":""}</b><small>{!p.connected?"RECONNECTING":!p.alive&&state.phase!=="lobby"?"ELIMINATED":p.ready&&state.phase==="lobby"?"READY":"IN GAME"}</small></div><strong>🏆 {p.wins}</strong></div>)}</div>{state.phase==="lobby"&&<div className="lobby-actions"><button className={`arcade-button ${me?.ready?"ready":""}`} onClick={ready}>{me?.ready?"READY ✓":"READY"}</button>{me?.host&&<button className="arcade-button primary" onClick={start} disabled={!canStart}>{connected.length<2?"NEED 2 PLAYERS":canStart?"START GAME":"WAITING FOR READY"}</button>}</div>}<button className="invite-button" onClick={copyInvite}>COPY INVITE LINK</button></aside>
+    </section>{error&&<div className="toast">{error}</div>}
+  </main>;
 }
 
-function Room({ roomCode }: { roomCode: string }) {
-  const name = localStorage.getItem("tiles:name") || "Player";
-  const socket = useMemo(() => new RoomSocket(roomCode, name), [roomCode, name]);
-  const [state, setState] = useState<GameState | null>(null);
-  const [myId, setMyId] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const [fatalError, setFatalError] = useState("");
-  const [connection, setConnection] = useState<"connecting" | "connected" | "reconnecting" | "closed">("connecting");
-  const [serverOffset, setServerOffset] = useState(0);
-  const [, forceTick] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const offState = socket.onState((next, serverTime) => {
-      setState(next);
-      setMyId(socket.playerId);
-      setServerOffset(serverTime - Date.now());
-      setError("");
-    });
-    const offError = socket.onError((message) => {
-      if (message === "This room is full" || message === "A match is already in progress") {
-        setFatalError(message);
-        socket.close();
-        return;
-      }
-      setError(message);
-    });
-    const offConnection = socket.onConnection(setConnection);
-    const timer = window.setInterval(() => forceTick((n) => n + 1), 100);
-
-    void (async () => {
-      try {
-        const response = await fetch(`/api/rooms/${roomCode}`);
-        if (!response.ok) throw new Error("This room does not exist or has expired.");
-        if (!cancelled) socket.connect();
-      } catch (e) {
-        if (!cancelled) setFatalError(e instanceof Error ? e.message : "Could not open this room.");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      offState();
-      offError();
-      offConnection();
-      window.clearInterval(timer);
-      socket.close();
-    };
-  }, [roomCode, socket]);
-
-  const me = state?.players.find((player) => player.id === myId) ?? null;
-  const remainingMs = state?.phaseEndsAt
-    ? Math.max(0, state.phaseEndsAt - (Date.now() + serverOffset))
-    : 0;
-  const seconds = Math.ceil(remainingMs / 1000);
-
-  const move = useCallback((tileId: number) => socket.send({ type: "move", tileId }), [socket]);
-  const choose = (color: TileColor) => socket.send({ type: "choose-color", color });
-  const usePower = () => socket.send({ type: "use-powerup" });
-  const ready = () => socket.send({ type: "ready", ready: !me?.ready });
-  const start = () => socket.send({ type: "start-game" });
-
-  if (fatalError) {
-    return (
-      <main className="loading error-screen">
-        <div>
-          <h1>Room unavailable</h1>
-          <p>{fatalError}</p>
-          <a className="primary link-as-button" href="/">Back to Tiles</a>
-        </div>
-      </main>
-    );
-  }
-
-  if (!state && error) {
-    return (
-      <main className="loading error-screen">
-        <div>
-          <h1>Couldn’t join room {roomCode}</h1>
-          <p>{error}</p>
-          <a className="primary link-as-button" href="/">Back to Tiles</a>
-        </div>
-      </main>
-    );
-  }
-
-  if (!state) return <main className="loading">Connecting to room {roomCode}…</main>;
-
-  const aliveCount = state.players.filter((player) => player.alive).length;
-  const connectedPlayers = state.players.filter((player) => player.connected);
-  const selector = state.players.find((player) => player.id === state.selectorId);
-  const canStart = connectedPlayers.length >= 2 && connectedPlayers.every((player) => player.ready || player.host);
-
-  async function copyInvite() {
-    const invite = `${location.origin}/room/${roomCode}`;
-    try {
-      await navigator.clipboard.writeText(invite);
-      setError("Invite link copied.");
-      window.setTimeout(() => setError(""), 1500);
-    } catch {
-      setError(invite);
-    }
-  }
-
-  return (
-    <main className="game-shell">
-      <div className="orientation-hint">Rotate to landscape for the best layout — portrait still works.</div>
-      <header className="game-header">
-        <div>
-          <span className="room-label">ROOM</span>
-          <b className="room-code">{roomCode}</b>
-        </div>
-        <div className="phase-title">{state.message}</div>
-        <div className="timer">{state.phaseEndsAt ? `${seconds}s` : `${aliveCount} alive`}</div>
-      </header>
-
-      {connection === "reconnecting" && <div className="connection-banner">Connection lost — reconnecting…</div>}
-
-      <section className="game-layout">
-        <aside className="power-panel">
-          <div className="panel-title">POWER</div>
-          {me?.powerup ? (
-            <button className={`power-button ${me.powerup}`} onClick={usePower}>
-              <span>{me.powerup === "phase" ? "P" : "S"}</span>
-              {me.powerup === "phase" ? "PHASE SHIFT" : "SPEED"}
-            </button>
-          ) : (
-            <div className="empty-power">No power-up</div>
-          )}
-          <div className="panel-note">Walk over a power-up to collect it.</div>
-        </aside>
-
-        <div className="board-wrap">
-          <GameCanvas state={state} myPlayerId={myId} onTileClick={move} />
-          {state.phase === "countdown" && <div className="center-overlay"><strong>{seconds}</strong><span>GET READY</span></div>}
-          {state.phase === "selector-wheel" && <div className="center-overlay compact"><strong>◉</strong><span>Choosing selector…</span></div>}
-          {state.phase === "selector-choice" && me?.id !== state.selectorId && <div className="center-overlay compact"><strong>{selector?.name ?? "Player"}</strong><span>is choosing a color…</span></div>}
-          {state.phase === "selector-choice" && me?.id === state.selectorId && (
-            <div className="selector-overlay">
-              <div className="selector-title">YOU CONTROL THE FLOOR</div>
-              <div className="selector-sub">Choose a color to drop</div>
-              <div className="color-buttons">
-                {TILE_COLORS.map((color) => (
-                  <button key={color} className={`color-button ${color}`} onClick={() => choose(color)}>
-                    {COLOR_LABELS[color]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {state.phase === "reveal" && (
-            <div className="drop-banner">
-              {state.selectedColor?.toUpperCase()} DROPS <span>{(remainingMs / 1000).toFixed(1)}s</span>
-            </div>
-          )}
-          {!me?.alive && state.phase !== "lobby" && state.phase !== "game-over" && <div className="spectator-badge">SPECTATING</div>}
-        </div>
-
-        <aside className="players-panel">
-          <div className="panel-title">PLAYERS</div>
-          {state.players.map((player) => (
-            <div className={`player-row ${!player.alive ? "dead" : ""} ${!player.connected ? "offline" : ""}`} key={player.id}>
-              <span className="player-dot">●</span>
-              <span className="player-name">
-                {player.name}{player.id === myId ? " (you)" : ""}{!player.connected ? " · reconnecting" : ""}
-              </span>
-              <span className="wins">🏆 {player.wins}</span>
-            </div>
-          ))}
-
-          {state.phase === "lobby" && (
-            <div className="lobby-actions">
-              <button className={me?.ready ? "secondary active" : "secondary"} onClick={ready}>
-                {me?.ready ? "Ready ✓" : "Ready"}
-              </button>
-              {me?.host && (
-                <button className="primary" onClick={start} disabled={!canStart}>
-                  {connectedPlayers.length < 2 ? "Need 2 players" : canStart ? "Start game" : "Waiting for ready"}
-                </button>
-              )}
-            </div>
-          )}
-
-          {state.phase === "game-over" && me?.host && <button className="primary" onClick={start}>Play again</button>}
-          <button className="link-button" onClick={copyInvite}>Copy invite link</button>
-        </aside>
-      </section>
-
-      {error && <div className={`error-toast ${error === "Invite link copied." ? "success-toast" : ""}`}>{error}</div>}
-    </main>
-  );
-}
-
-export default function App() {
-  const [introDone, setIntroDone] = useState(() => localStorage.getItem("tiles:intro") === "done");
-  const room = currentRoomCode();
-  const finishIntro = () => {
-    localStorage.setItem("tiles:intro", "done");
-    setIntroDone(true);
-  };
-
-  return (
-    <>
-      {!introDone && <Intro onDone={finishIntro} />}
-      {room ? <Room roomCode={room} /> : <Landing />}
-    </>
-  );
-}
+export default function App(){const [introDone,setIntroDone]=useState(()=>localStorage.getItem("tiles:intro:v3")==="done");const room=currentRoomCode();const done=()=>{localStorage.setItem("tiles:intro:v3","done");setIntroDone(true);};return <>{!introDone&&<Intro onDone={done}/>} {room?<Room roomCode={room}/>:<Landing/>}</>;}

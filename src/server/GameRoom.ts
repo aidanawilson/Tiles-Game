@@ -19,6 +19,7 @@ import {
 } from "../shared/constants";
 import { encodeServerMessage, parseClientMessage } from "../shared/messages";
 import {
+  PLAYER_COLORS,
   TILE_COLORS,
   type ClientMessage,
   type GameState,
@@ -151,6 +152,7 @@ function emptyState(roomCode: string): GameState {
     players: [],
     powerups: [],
     selectorId: null,
+    selectorCandidates: [],
     selectedColor: null,
     phaseEndsAt: null,
     message: "Waiting for players",
@@ -175,6 +177,15 @@ export class GameRoom extends DurableObject<Env> {
       if (stored) {
         this.created = stored.created;
         this.state = stored.state;
+        this.state.selectorCandidates ??= [];
+        const alreadyUsed = new Set<string>();
+        for (let i = 0; i < this.state.players.length; i++) {
+          const player = this.state.players[i] as PlayerState & { color?: string };
+          if (!player.color || alreadyUsed.has(player.color)) {
+            player.color = PLAYER_COLORS.find((color) => !alreadyUsed.has(color)) ?? PLAYER_COLORS[i % PLAYER_COLORS.length];
+          }
+          alreadyUsed.add(player.color);
+        }
         this.roomCode = stored.state.roomCode;
         this.reconnectTokens = stored.reconnectTokens ?? {};
         this.disconnectedAt = stored.disconnectedAt ?? {};
@@ -346,9 +357,12 @@ export class GameRoom extends DurableObject<Env> {
       const token = crypto.randomUUID();
       const occupied = new Set(this.state.players.map((p) => p.tileId));
       const spawn = this.pickSpawnTile(occupied);
+      const usedColors = new Set(this.state.players.map((p) => p.color));
+      const playerColor = PLAYER_COLORS.find((color) => !usedColors.has(color)) ?? PLAYER_COLORS[this.state.players.length % PLAYER_COLORS.length];
       player = {
         id: playerId,
         name: cleanName,
+        color: playerColor,
         tileId: spawn,
         alive: true,
         connected: true,
@@ -419,6 +433,7 @@ export class GameRoom extends DurableObject<Env> {
     this.state.tiles = assignRandomColors(makeHexes(BOARD_RADIUS));
     this.state.selectedColor = null;
     this.state.selectorId = null;
+    this.state.selectorCandidates = [];
     this.state.powerups = this.spawnPowerups();
     for (const p of this.state.players) {
       if (!p.alive) continue;
@@ -457,7 +472,10 @@ export class GameRoom extends DurableObject<Env> {
       p.avoidTileId = null;
       p.avoidUntil = null;
     }
-    const selector = this.pickSelector();
+    const eligible = this.selectorEligiblePlayers();
+    if (!eligible.length) return this.finishMatch();
+    this.state.selectorCandidates = eligible.map((p) => p.id);
+    const selector = this.pickSelector(eligible);
     if (!selector) return this.finishMatch();
     this.state.selectorId = selector.id;
     this.state.phase = "selector-wheel";
@@ -537,6 +555,7 @@ export class GameRoom extends DurableObject<Env> {
     this.state.phase = "game-over";
     this.state.phaseEndsAt = null;
     this.state.selectorId = null;
+    this.state.selectorCandidates = [];
     this.state.selectedColor = null;
     for (const p of this.state.players) p.ready = false;
     this.persistSoon();
@@ -575,7 +594,8 @@ export class GameRoom extends DurableObject<Env> {
 
   private hasCommittedCollision(player: PlayerState, now: number): boolean {
     if (player.movingToTileId == null || player.moveEndsAt == null) return false;
-    const timeToImpact = player.moveEndsAt - now;
+    const playerMoveEndsAt = player.moveEndsAt;
+    const timeToImpact = playerMoveEndsAt - now;
     if (timeToImpact < 0 || timeToImpact > COLLISION_COMMIT_MS) return false;
 
     return this.state.players.some((other) => {
@@ -583,7 +603,7 @@ export class GameRoom extends DurableObject<Env> {
       if (other.tileId === player.movingToTileId) {
         // If the occupant is moving away and will clear the tile before impact,
         // do not commit a collision yet.
-        if (other.movingToTileId != null && other.moveEndsAt != null && other.moveEndsAt < player.moveEndsAt - 35) {
+        if (other.movingToTileId != null && other.moveEndsAt != null && other.moveEndsAt < playerMoveEndsAt - 35) {
           return false;
         }
         return true;
@@ -591,7 +611,7 @@ export class GameRoom extends DurableObject<Env> {
       if (other.movingToTileId == null || other.moveEndsAt == null) return false;
       const sameTarget = other.movingToTileId === player.movingToTileId;
       const headOn = other.movingToTileId === player.tileId && player.movingToTileId === other.tileId;
-      return (sameTarget || headOn) && Math.abs(other.moveEndsAt - player.moveEndsAt) <= COLLISION_COMMIT_MS;
+      return (sameTarget || headOn) && Math.abs(other.moveEndsAt - playerMoveEndsAt) <= COLLISION_COMMIT_MS;
     });
   }
 
@@ -778,25 +798,28 @@ export class GameRoom extends DurableObject<Env> {
     return result;
   }
 
-  private pickSelector(): PlayerState | null {
+  private selectorEligiblePlayers(): PlayerState[] {
     const alive = this.state.players.filter((p) => p.alive && p.connected);
-    if (!alive.length) return null;
+    if (!alive.length) return [];
     const counts = this.state.fairness.cycleCounts;
     for (const p of alive) if (counts[p.id] == null) counts[p.id] = 0;
 
-    const everyoneHasOne = alive.every((p) => counts[p.id] >= 1);
-    if (everyoneHasOne) {
+    if (alive.every((p) => counts[p.id] >= 1)) {
       for (const p of alive) counts[p.id] = 0;
       this.state.fairness.doubledPlayers = [];
     }
 
     const zeros = alive.filter((p) => counts[p.id] === 0);
     const doubled = alive.filter((p) => counts[p.id] >= 2);
-    let eligible: PlayerState[];
-    if (zeros.length && doubled.length >= 2) eligible = zeros;
-    else eligible = alive.filter((p) => counts[p.id] < 2);
-    if (!eligible.length) eligible = zeros.length ? zeros : alive;
+    if (zeros.length && doubled.length >= 2) return zeros;
+    const eligible = alive.filter((p) => counts[p.id] < 2);
+    return eligible.length ? eligible : (zeros.length ? zeros : alive);
+  }
 
+  private pickSelector(eligible: PlayerState[]): PlayerState | null {
+    if (!eligible.length) return null;
+    const alive = this.state.players.filter((p) => p.alive && p.connected);
+    const counts = this.state.fairness.cycleCounts;
     const chosen = eligible[randomIndex(eligible.length)];
     counts[chosen.id] = (counts[chosen.id] ?? 0) + 1;
     this.state.fairness.doubledPlayers = alive.filter((p) => counts[p.id] >= 2).map((p) => p.id);

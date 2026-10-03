@@ -1,59 +1,53 @@
-# Tiles V0.2 — First Playtest
+# Tiles V0.3 test checklist
 
-Do this before investing in sprite art.
+## Deployment smoke test
 
-## Build sanity
+1. Push the complete repo to GitHub.
+2. Let the connected Cloudflare Worker build with `npm run build` and deploy with `npx wrangler deploy`.
+3. Confirm the deployment reports the `GAME_ROOMS (GameRoom)` Durable Object binding.
+4. Open the workers.dev URL before attaching/changing the production subdomain.
 
-```bash
-npm install
-npm run check
-npm run dev
-```
+## Two-device test
 
-## Two-player minimum test
+1. Create a room on desktop.
+2. Join from an iPhone/Android device.
+3. Confirm each player receives a different character color.
+4. Ready both players and start.
+5. Tap distant tiles rapidly; movement should be visually continuous rather than stopping at every hex.
+6. Confirm both devices show the same player locations and round result.
 
-1. Create a room in browser/device A.
-2. Join the code in browser/device B.
-3. Confirm both screens show both players.
-4. Ready B; confirm A can start the match.
-5. Confirm 3 → 2 → 1 countdown and a 19-hex board.
-6. Tap several distant tiles on both devices and confirm both screens agree on movement.
-7. Change destinations rapidly, then verify inputs stop changing course during a committed collision/recovery.
-8. Force a head-on route swap and a glancing/same-target collision.
-9. Race for a power-up; confirm only the character that reaches its tile first receives it.
-10. Play through several selector rounds and confirm the board colors reshuffle every round.
-11. Verify only the selected color drops and only players on that color are eliminated.
-12. If Phase Shift appears, stand on the doomed color and activate it during the 1.15 s reveal window.
-13. Finish a match and confirm the winner gains one trophy.
-14. Start a rematch and confirm trophies remain.
+## Visual test
 
-## Reconnect test
+- 19 extruded hex tiles are visible and easy to tap.
+- Tile colors reshuffle every round.
+- Player sprites animate while idle and moving.
+- Player color in the right-side list matches the arena sprite.
+- The selector wheel removes eliminated players and uses only eligible player colors.
+- The color selector popup has six colors and no extra Tiles logo.
+- The doomed floor visibly progresses through warning/crack/drop states.
+- The UI has no permanent countdown timer or MOVE PHASE banner.
 
-1. During a room, refresh one player's tab.
-2. Confirm it returns as the same player instead of creating a duplicate.
-3. Close a player's tab for less than 45 seconds, reopen/rejoin in the same tab session if possible, and verify the reserved seat behavior.
-4. Disconnect the host and confirm host authority transfers to a connected player.
+## iPhone landscape tutorial regression test
 
-## Multi-device test
+1. Open on an iPhone in Safari or Home Screen mode.
+2. Rotate to landscape before/during the tutorial.
+3. Confirm tutorial content may scroll internally if necessary.
+4. Confirm SKIP/NEXT/BACK/I'M READY remain reachable.
+5. Confirm tutorial says Tap, not keyboard/key language.
 
-After local testing, deploy to Cloudflare and repeat on:
+## iOS reconnect regression test
 
-- one phone + one laptop
-- two phones
-- landscape phone layout
-- portrait phone layout
-- ideally one device on Wi-Fi and one on cellular
+1. Join a room from an iPhone Home Screen installation.
+2. Note the player's name, color, and trophy count.
+3. Close the web app completely.
+4. Reopen and return/resume the same room within 45 seconds.
+5. Confirm the original seat is reclaimed.
+6. Confirm there is NOT a duplicate player with the same name.
+7. Confirm the same character color and trophy count are preserved.
 
-## Feedback to capture
+## Audio
 
-For the next revision, note:
-
-- Does 19 tiles feel crowded in a good way or frustrating?
-- Is 180 ms per hex fast enough?
-- Is 7 seconds the right movement window?
-- Is the selector's 4-second choice window too long/short?
-- Are collisions fun or annoying?
-- Is Phase Shift's 1.15-second reaction window fair?
-- Are power-ups too frequent or too rare?
-- Does portrait mode remain usable?
-- What is the first thing a new player fails to understand?
+- Music starts only after a user interaction if autoplay is blocked.
+- Music loops without restarting each round.
+- Mute button works.
+- Mute choice persists on the device.
