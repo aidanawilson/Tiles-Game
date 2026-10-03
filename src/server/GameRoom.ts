@@ -296,6 +296,10 @@ export class GameRoom extends DurableObject<Env> {
       case "use-powerup":
         this.usePowerup(player);
         break;
+      case "leave-room":
+        await this.leavePlayer(player.id);
+        try { ws.close(1000, "Player left room"); } catch {}
+        return;
       case "ping":
         ws.send(encodeServerMessage({ type: "pong", clientTime: message.clientTime, serverTime: Date.now() }));
         return;
@@ -868,6 +872,45 @@ export class GameRoom extends DurableObject<Env> {
     const connected = this.state.players.filter((p) => p.connected);
     for (const p of this.state.players) p.host = false;
     if (connected.length) connected[0].host = true;
+  }
+
+  private async leavePlayer(playerId: string) {
+    const leaving = this.state.players.find((p) => p.id === playerId);
+    if (!leaving) return;
+
+    const wasHost = leaving.host;
+    const wasAlive = leaving.alive;
+    this.state.players = this.state.players.filter((p) => p.id !== playerId);
+    delete this.reconnectTokens[playerId];
+    delete this.disconnectedAt[playerId];
+    delete this.state.fairness.cycleCounts[playerId];
+    this.state.fairness.doubledPlayers = this.state.fairness.doubledPlayers.filter((id) => id !== playerId);
+    this.state.selectorCandidates = this.state.selectorCandidates.filter((id) => id !== playerId);
+    if (this.state.selectorId === playerId) this.state.selectorId = null;
+
+    if (this.state.players.length === 0) {
+      this.reconnectTokens = {};
+      this.disconnectedAt = {};
+      this.created = false;
+      await this.ctx.storage.deleteAll();
+      return;
+    }
+
+    if (wasHost || !this.state.players.some((p) => p.host)) this.transferHost();
+
+    const activeMatch = !["lobby", "game-over"].includes(this.state.phase);
+    if (activeMatch) {
+      const alive = this.state.players.filter((p) => p.alive);
+      if (wasAlive && alive.length <= 1) {
+        this.finishMatch();
+      } else if (this.state.phase === "selector-choice" && !this.state.selectorId) {
+        this.state.phase = "reveal";
+        this.revealColor(TILE_COLORS[randomIndex(TILE_COLORS.length)]);
+      }
+    }
+
+    await this.persist();
+    this.broadcastState();
   }
 
   private async removeExpiredDisconnected(notify = true) {

@@ -1,0 +1,28 @@
+Tiles v0.4 arcade UI refresh + bug-fix source update
+
+Included changes:
+- Replaced the in-game music file with the trimmed loop-ready MP3 (removed trailing silence/gap).
+- Refreshed the UI styling to feel much more like a retro arcade game:
+  - brighter gold/pixel-style buttons
+  - more saturated neon/glow treatment
+  - stronger logo treatment
+  - more game-like landing page panels and menu visuals
+  - upgraded arena/panel styling
+- Added a Leave Room button.
+- Leave Room now sends a websocket leave-room message so the room seat is freed immediately.
+- The 'is choosing...' overlay now uses the player NAME instead of their color.
+- Improved mobile responsiveness / safe-area spacing and stacked small-screen layouts.
+- Updated tile-fall rendering so dropped tiles become holes rather than leaving the 3D side wall visible.
+- Added more glow/shadow life to the board and power-up presentation.
+
+Files changed:
+- public/audio/retro-arcade-theme.mp3
+- src/client/App.tsx
+- src/client/styles.css
+- src/client/game/GameCanvas.tsx
+- src/shared/types.ts
+- src/shared/messages.ts
+- src/server/GameRoom.ts
+
+Note:
+- This archive is a source-update package. A fresh npm install/build is still required in a normal dev environment because this offline workspace could not fetch npm packages.

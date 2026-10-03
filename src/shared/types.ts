@@ -80,6 +80,7 @@ export type ClientMessage =
   | { type: "move"; tileId: number }
   | { type: "choose-color"; color: TileColor }
   | { type: "use-powerup" }
+  | { type: "leave-room" }
   | { type: "ping"; clientTime: number };
 
 export type ServerMessage =

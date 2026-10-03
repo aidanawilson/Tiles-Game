@@ -28,6 +28,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
           : null;
       case "use-powerup":
         return { type: "use-powerup" };
+      case "leave-room":
+        return { type: "leave-room" };
       case "ping":
         return typeof value.clientTime === "number" && Number.isFinite(value.clientTime)
           ? { type: "ping", clientTime: value.clientTime }
