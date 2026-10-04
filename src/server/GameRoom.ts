@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
-import { BASE_STEP_MS, BOARD_RADIUS, BOT_READY_MAX_MS, BOT_READY_MIN_MS, BOT_SELECTOR_MAX_MS, BOT_SELECTOR_MIN_MS, BUBBLE_COLLISION_MS, BUBBLE_DURATION_MS, COLLISION_COMMIT_MS, COLLISION_PAIR_COOLDOWN_MS, GLANCING_COLLISION_MS, HEAD_ON_COLLISION_MS, MAX_PLAYERS, MIN_PLAYERS, MOVEMENT_PHASE_MS, PUBLIC_FIRST_BOT_DELAY_MS, PUBLIC_NEXT_BOT_MAX_MS, PUBLIC_NEXT_BOT_MIN_MS, RECONNECT_GRACE_MS, RESULTS_MS, REVEAL_WINDOW_MS, SELECTOR_CHOICE_MS, SELECTOR_WHEEL_MS, SPEED_DURATION_MS, SPEED_STEP_MS, START_COUNTDOWN_MS, } from "../shared/constants";
+import { BASE_STEP_MS, BOARD_RADIUS, BOT_READY_MAX_MS, BOT_READY_MIN_MS, BOT_SELECTOR_MAX_MS, BOT_SELECTOR_MIN_MS, BUBBLE_DURATION_MS, MAX_PLAYERS, MIN_PLAYERS, MOVEMENT_PHASE_MS, PUBLIC_FIRST_BOT_DELAY_MS, PUBLIC_NEXT_BOT_MAX_MS, PUBLIC_NEXT_BOT_MIN_MS, RECONNECT_GRACE_MS, RESULTS_MS, REVEAL_WINDOW_MS, SELECTOR_CHOICE_MS, SELECTOR_WHEEL_MS, SPEED_DURATION_MS, SPEED_STEP_MS, START_COUNTDOWN_MS, } from "../shared/constants";
 import { encodeServerMessage, parseClientMessage } from "../shared/messages";
-import { PLAYER_COLORS, TILE_COLORS, type ClientMessage, type CollisionRole, type GameState, type HexTile, type PlayerState, type PowerupState, type PowerupType, type RoomVisibility, type TileColor, } from "../shared/types";
+import { PLAYER_COLORS, TILE_COLORS, type ClientMessage, type GameState, type HexTile, type PlayerState, type PowerupState, type PowerupType, type RoomVisibility, type TileColor, } from "../shared/types";
 interface Env {
 }
 interface SocketAttachment {
@@ -26,7 +26,6 @@ function shuffled<T>(items: T[]) { const a = [...items]; for (let i = a.length -
     const j = randInt(i + 1);
     [a[i], a[j]] = [a[j], a[i]];
 } return a; }
-function pairKey(a: string, b: string) { return a < b ? `${a}|${b}` : `${b}|${a}`; }
 function makeHexes(radius: number): HexTile[] {
     const tiles: HexTile[] = [];
     let n = 0;
@@ -106,7 +105,6 @@ export class GameRoom extends DurableObject<Env> {
     private botFillTimer: ReturnType<typeof setTimeout> | null = null;
     private nextBotAt: number | null = null;
     private botTimers = new Set<ReturnType<typeof setTimeout>>();
-    private pairCooldowns = new Map<string, number>();
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
         this.ctx.blockConcurrencyWhile(async () => {
@@ -131,6 +129,7 @@ export class GameRoom extends DurableObject<Env> {
                 p.collisionPartnerId ??= null;
                 p.collisionResolveTileId ??= null;
                 p.collisionRole ??= null;
+                blankCollision(p);
             }
             // A committed lobby countdown can safely resume from its persisted deadline.
             if (this.state.phase === "countdown" && this.state.phaseEndsAt) {
@@ -549,183 +548,167 @@ export class GameRoom extends DurableObject<Env> {
         this.scheduleExistingBotsReady();
         this.scheduleBotFill(PUBLIC_FIRST_BOT_DELAY_MS);
     } this.persistSoon(); this.broadcastState(); }
-    private requestMove(p: PlayerState, tileId: number) { if (this.state.phase !== "movement" || !p.alive)
-        return; const now = Date.now(); if (p.collisionUntil && p.collisionUntil > now)
-        return; if (this.hasCommittedCollision(p, now))
-        return; if (!this.state.tiles.some(t => t.id === tileId))
-        return; if (this.state.players.some(o => o.alive && o.id !== p.id && o.tileId === tileId))
-        return; p.destinationTileId = tileId; this.recomputePath(p); }
-    private collisionReservations(now = Date.now()) { const map = new Map<number, string>(); for (const player of this.state.players) {
-        if (player.collisionUntil && player.collisionUntil > now && player.collisionResolveTileId != null)
-            map.set(player.collisionResolveTileId, player.id);
-    } return map; }
-    private recomputePath(p: PlayerState) { if (p.destinationTileId == null)
-        return; const blocked = new Set(this.state.players.filter(o => o.alive && o.id !== p.id && o.tileId !== p.destinationTileId).map(o => o.tileId)); for (const [tileId, owner] of this.collisionReservations()) {
-        if (owner !== p.id)
-            blocked.add(tileId);
-    } p.path = pathfind(this.state.tiles, p.tileId, p.destinationTileId, blocked); this.queueNextStep(p); }
-    private queueNextStep(p: PlayerState) { if (p.movingToTileId != null || !p.path.length)
-        return; const next = p.path.shift()!, now = Date.now(), step = p.speedBoostUntil && p.speedBoostUntil > now ? SPEED_STEP_MS : BASE_STEP_MS; p.movingFromTileId = p.tileId; p.movingToTileId = next; p.moveStartedAt = now; p.moveEndsAt = now + step; }
-    private hasCommittedCollision(p: PlayerState, now: number) { if (p.movingToTileId == null || p.moveEndsAt == null)
-        return false; const t = p.moveEndsAt - now; if (t < 0 || t > COLLISION_COMMIT_MS)
-        return false; return this.state.players.some(o => { if (!o.alive || o.id === p.id || this.pairCooling(p, o, now))
-        return false; if (o.tileId === p.movingToTileId)
-        return !(o.movingToTileId != null && o.moveEndsAt != null && o.moveEndsAt < p.moveEndsAt! - 35); if (o.movingToTileId == null || o.moveEndsAt == null)
-        return false; return (o.movingToTileId === p.movingToTileId || (o.movingToTileId === p.tileId && p.movingToTileId === o.tileId)) && Math.abs(o.moveEndsAt - p.moveEndsAt!) <= COLLISION_COMMIT_MS; }); }
+    private requestMove(p: PlayerState, tileId: number) {
+        if (this.state.phase !== "movement" || !p.alive)
+            return;
+        if (!this.state.tiles.some(t => t.id === tileId))
+            return;
+        // Occupied destinations are intentionally valid. Occupancy is resolved only
+        // when a movement step actually reaches the destination tile.
+        p.destinationTileId = tileId;
+        this.recomputePath(p);
+    }
+    private recomputePath(p: PlayerState, extraBlocked: Set<number> = new Set()) {
+        if (p.destinationTileId == null)
+            return;
+        // Retargeting during an in-progress step plans from the tile the player is
+        // already committed to reaching, avoiding a duplicate self-step on arrival.
+        const routeStart = p.movingToTileId ?? p.tileId;
+        p.path = pathfind(this.state.tiles, routeStart, p.destinationTileId, extraBlocked);
+        this.queueNextStep(p);
+    }
+    private queueNextStep(p: PlayerState) {
+        if (p.movingToTileId != null || !p.path.length)
+            return;
+        const next = p.path.shift()!, now = Date.now(), step = p.speedBoostUntil && p.speedBoostUntil > now ? SPEED_STEP_MS : BASE_STEP_MS;
+        p.movingFromTileId = p.tileId;
+        p.movingToTileId = next;
+        p.moveStartedAt = now;
+        p.moveEndsAt = now + step;
+    }
     private startMovementLoop() { this.stopMovementLoop(); this.movementTimer = setInterval(() => this.tickMovement(), 40); }
     private stopMovementLoop() { if (this.movementTimer)
         clearInterval(this.movementTimer); this.movementTimer = null; }
-    private pairCooling(a: PlayerState, b: PlayerState, now = Date.now()) { const until = this.pairCooldowns.get(pairKey(a.id, b.id)) ?? 0; if (until <= now) {
-        this.pairCooldowns.delete(pairKey(a.id, b.id));
-        return false;
-    } return true; }
     private tickMovement() {
         if (this.state.phase !== "movement")
             return this.stopMovementLoop();
         const now = Date.now();
         for (const p of this.state.players) {
-            if (p.collisionUntil && p.collisionUntil <= now)
-                this.resolveCollisionPlayer(p, now);
+            // v0.6 removes normal player-vs-player collision states. Clear any stale
+            // collision metadata left by a pre-deploy room and only keep Bubble time.
+            if (p.collisionUntil || p.collisionType)
+                blankCollision(p);
             if (p.bubbleUntil && p.bubbleUntil <= now)
                 p.bubbleUntil = null;
         }
-        const due = this.state.players.filter(p => p.alive && p.movingToTileId != null && p.moveEndsAt != null && p.moveEndsAt <= now && !(p.collisionUntil && p.collisionUntil > now));
-        const handled = new Set<string>();
-        for (let i = 0; i < due.length; i++) {
-            const a = due[i];
-            if (handled.has(a.id))
-                continue;
-            for (let j = i + 1; j < due.length; j++) {
-                const b = due[j];
-                if (handled.has(b.id) || this.pairCooling(a, b, now))
-                    continue;
-                const head = a.movingToTileId === b.tileId && b.movingToTileId === a.tileId, same = a.movingToTileId === b.movingToTileId;
-                if (head || same) {
-                    this.applyCollision(a, b, head ? "head-on" : "glancing", now);
-                    handled.add(a.id);
-                    handled.add(b.id);
-                    break;
-                }
+        const due = this.state.players
+            .filter(p => p.alive && p.movingToTileId != null && p.moveEndsAt != null && p.moveEndsAt <= now)
+            .sort((a, b) => (a.moveEndsAt! - b.moveEndsAt!) || a.id.localeCompare(b.id));
+        if (!due.length) {
+            if (now - this.lastTick > 250) {
+                this.lastTick = now;
+                this.broadcastState();
             }
-        }
-        let changed = handled.size > 0;
-        for (const p of due) {
-            if (handled.has(p.id) || p.movingToTileId == null)
-                continue;
-            const target = p.movingToTileId;
-            const reservedBy = this.collisionReservations(now).get(target);
-            if (reservedBy && reservedBy !== p.id) {
-                p.path = [];
-                blankMotionStep(p);
-                this.recomputePath(p);
-                changed = true;
-                continue;
-            }
-            const occ = this.state.players.find(o => o.alive && o.id !== p.id && o.tileId === target);
-            if (occ) {
-                if (this.pairCooling(p, occ, now)) {
-                    p.path = [];
-                    blankMotionStep(p);
-                    this.recomputePath(p);
-                    changed = true;
-                    continue;
-                }
-                this.applyCollision(p, occ, occ.movingToTileId === p.tileId ? "head-on" : "glancing", now);
-                handled.add(p.id);
-                handled.add(occ.id);
-                changed = true;
-                continue;
-            }
-            p.tileId = target;
-            blankMotionStep(p);
-            this.collectPowerup(p);
-            this.queueNextStep(p);
-            changed = true;
-        }
-        if (changed || now - this.lastTick > 250) {
-            this.lastTick = now;
-            this.broadcastState();
-        }
-    }
-    private applyCollision(a: PlayerState, b: PlayerState, type: "glancing" | "head-on", now: number) {
-        const aBubble = (a.bubbleUntil ?? 0) > now, bBubble = (b.bubbleUntil ?? 0) > now;
-        if (aBubble !== bBubble) {
-            this.applyBubbleCollision(aBubble ? a : b, aBubble ? b : a, now);
             return;
         }
-        const event = id("col"), duration = type === "head-on" ? HEAD_ON_COLLISION_MS : GLANCING_COLLISION_MS;
-        const occupied = new Set(this.state.players.filter(p => p.alive && p.id !== a.id && p.id !== b.id).map(p => p.tileId));
-        for (const [tileId, owner] of this.collisionReservations(now)) {
-            if (owner !== a.id && owner !== b.id)
-                occupied.add(tileId);
-        }
-        let aRole: CollisionRole = "equal", bRole: CollisionRole = "equal", aResolve = a.tileId, bResolve = b.tileId;
-        if (type === "glancing") {
-            const target = a.movingToTileId === b.movingToTileId ? a.movingToTileId : (a.movingToTileId === b.tileId ? b.tileId : b.movingToTileId === a.tileId ? a.tileId : null);
-            const aArrival = a.moveEndsAt ?? Infinity, bArrival = b.moveEndsAt ?? Infinity;
-            let aWins: boolean;
-            if (a.movingToTileId === b.tileId && b.movingToTileId == null)
-                aWins = false;
-            else if (b.movingToTileId === a.tileId && a.movingToTileId == null)
-                aWins = true;
-            else
-                aWins = aArrival < bArrival || (aArrival === bArrival && a.id < b.id);
-            const winner = aWins ? a : b, loser = aWins ? b : a;
-            if (target != null && !occupied.has(target)) {
-                if (winner.id === a.id)
-                    aResolve = target;
-                else
-                    bResolve = target;
+
+        // One authoritative winner per target tile. This is the deterministic
+        // "first arrival owns it" rule for simultaneous attempts.
+        const winnerByTarget = new Map<number, PlayerState>();
+        const winnerIds = new Set<string>();
+        for (const p of due) {
+            const target = p.movingToTileId!;
+            if (!winnerByTarget.has(target)) {
+                winnerByTarget.set(target, p);
+                winnerIds.add(p.id);
             }
-            const sidestep = this.pickCollisionSidestep(loser, occupied, new Set([aResolve, bResolve, target ?? -1]));
-            if (sidestep != null) {
-                if (loser.id === a.id)
-                    aResolve = sidestep;
-                else
-                    bResolve = sidestep;
+        }
+        const occupantAtStart = new Map<number, PlayerState>();
+        for (const p of this.state.players)
+            if (p.alive)
+                occupantAtStart.set(p.tileId, p);
+
+        const memo = new Map<string, boolean>();
+        const visiting = new Set<string>();
+        const canVacateChain = (p: PlayerState): boolean => {
+            if (memo.has(p.id))
+                return memo.get(p.id)!;
+            if (!winnerIds.has(p.id) || p.movingToTileId == null) {
+                memo.set(p.id, false);
+                return false;
             }
-            aRole = aWins ? "priority" : "yield";
-            bRole = aWins ? "yield" : "priority";
+            if (visiting.has(p.id))
+                return true; // closed swap/cycle; all members vacate simultaneously.
+            visiting.add(p.id);
+            const occ = occupantAtStart.get(p.movingToTileId);
+            let ok = !occ || occ.id === p.id;
+            if (occ && occ.id !== p.id)
+                ok = canVacateChain(occ);
+            visiting.delete(p.id);
+            memo.set(p.id, ok);
+            return ok;
+        };
+
+        const successful = due.filter(p => winnerIds.has(p.id) && canVacateChain(p));
+        const successfulIds = new Set(successful.map(p => p.id));
+
+        // Apply all normal successful moves together so direct swaps and longer
+        // movement cycles do not see one another as stationary blockers.
+        for (const p of successful)
+            p.tileId = p.movingToTileId!;
+        for (const p of successful) {
+            blankMotionStep(p);
+            this.collectPowerup(p);
+            if (p.destinationTileId === p.tileId)
+                p.destinationTileId = null;
+            this.queueNextStep(p);
         }
-        else {
-            const aSide = this.pickCollisionSidestep(a, occupied, new Set([b.tileId]));
-            if (aSide != null)
-                aResolve = aSide;
-            occupied.add(aResolve);
-            const bSide = this.pickCollisionSidestep(b, occupied, new Set([a.tileId, aResolve]));
-            if (bSide != null)
-                bResolve = bSide;
-            aRole = "equal";
-            bRole = "equal";
+
+        // Resolve blocked winners after normal departures. Bubble is the only
+        // mechanic allowed to forcibly claim an occupied destination tile.
+        for (const p of due) {
+            if (successfulIds.has(p.id))
+                continue;
+            const target = p.movingToTileId!;
+            blankMotionStep(p);
+            const occ = this.state.players.find(o => o.alive && o.id !== p.id && o.tileId === target);
+            const bubbleActive = (p.bubbleUntil ?? 0) > now;
+            const victimBubble = occ ? (occ.bubbleUntil ?? 0) > now : false;
+            if (occ && bubbleActive && !victimBubble) {
+                const occupied = new Set(this.state.players.filter(o => o.alive && o.id !== occ.id).map(o => o.tileId));
+                const knocked = this.pickKnockTile(p, occ, occupied);
+                if (knocked != null) {
+                    const victimDestination = occ.destinationTileId;
+                    occ.tileId = knocked;
+                    blankMotion(occ);
+                    occ.destinationTileId = victimDestination === knocked ? null : victimDestination;
+                    this.collectPowerup(occ);
+                    if (occ.destinationTileId != null)
+                        this.recomputePath(occ);
+                    p.tileId = target;
+                    this.collectPowerup(p);
+                    if (p.destinationTileId === p.tileId)
+                        p.destinationTileId = null;
+                    this.queueNextStep(p);
+                    successfulIds.add(p.id);
+                    continue;
+                }
+            }
+
+            // If this is the final requested tile, stop just outside it. If an
+            // intermediate path cell is occupied, reroute around that cell.
+            if (p.destinationTileId === target) {
+                p.destinationTileId = null;
+                p.path = [];
+            }
+            else if (p.destinationTileId != null) {
+                this.recomputePath(p, new Set([target]));
+            }
         }
-        this.setCollision(a, b, event, type, aRole, aResolve, now, duration);
-        this.setCollision(b, a, event, type, bRole, bResolve, now, duration);
-        this.pairCooldowns.set(pairKey(a.id, b.id), now + duration + COLLISION_PAIR_COOLDOWN_MS);
+        this.lastTick = now;
+        this.broadcastState();
     }
-    private applyBubbleCollision(source: PlayerState, victim: PlayerState, now: number) { const event = id("col"), occupied = new Set(this.state.players.filter(p => p.alive && p.id !== victim.id).map(p => p.tileId)); for (const [tileId, owner] of this.collisionReservations(now)) {
-        if (owner !== victim.id)
-            occupied.add(tileId);
-    } const knocked = this.pickKnockTile(source, victim, occupied); this.setCollision(source, victim, event, "bubble", "source", source.tileId, now, 110); this.setCollision(victim, source, event, "bubble", "victim", knocked ?? victim.tileId, now, BUBBLE_COLLISION_MS); this.pairCooldowns.set(pairKey(source.id, victim.id), now + BUBBLE_COLLISION_MS + COLLISION_PAIR_COOLDOWN_MS); }
-    private setCollision(p: PlayerState, other: PlayerState, event: string, type: PlayerState["collisionType"], role: CollisionRole, resolve: number, now: number, duration: number) { p.collisionStartedAt = now; p.collisionUntil = now + duration; p.collisionType = type; p.collisionEventId = event; p.collisionPartnerId = other.id; p.collisionResolveTileId = resolve; p.collisionRole = role; blankMotionStep(p); }
-    private resolveCollisionPlayer(p: PlayerState, now: number) { const desired = p.collisionResolveTileId; const occupied = new Set(this.state.players.filter(o => o.alive && o.id !== p.id).map(o => o.tileId)); if (desired != null && !occupied.has(desired))
-        p.tileId = desired;
-    else if (desired != null && desired !== p.tileId) {
-        const fallback = this.pickCollisionSidestep(p, occupied, new Set(this.collisionReservations(now).keys()));
-        if (fallback != null)
-            p.tileId = fallback;
-    } blankCollision(p); this.collectPowerup(p); this.recomputePath(p); if (p.movingToTileId == null && p.destinationTileId != null && p.destinationTileId !== p.tileId && !this.state.players.some(o => o.alive && o.id !== p.id && o.tileId === p.destinationTileId)) {
-        this.recomputePath(p);
-    } }
-    private pickCollisionSidestep(p: PlayerState, occupied: Set<number>, reserved: Set<number>) { const tile = this.state.tiles.find(t => t.id === p.tileId); if (!tile)
-        return null; const options = shuffled(neighbors(tile, this.state.tiles)).filter(t => !occupied.has(t.id) && !reserved.has(t.id)); if (!options.length)
-        return null; if (p.destinationTileId != null) {
-        const dest = this.state.tiles.find(t => t.id === p.destinationTileId);
-        if (dest)
-            options.sort((a, b) => hexDistance(a, dest) - hexDistance(b, dest));
-    } return options[0]?.id ?? null; }
-    private pickKnockTile(source: PlayerState, victim: PlayerState, occupied: Set<number>) { const s = this.state.tiles.find(t => t.id === source.tileId), v = this.state.tiles.find(t => t.id === victim.tileId); if (!s || !v)
-        return null; const vx = v.q - s.q, vy = v.r - s.r; const opts = neighbors(v, this.state.tiles).filter(t => !occupied.has(t.id)); if (!opts.length)
-        return null; opts.sort((a, b) => ((b.q - v.q) * vx + (b.r - v.r) * vy) - ((a.q - v.q) * vx + (a.r - v.r) * vy)); return opts[0].id; }
+    private pickKnockTile(source: PlayerState, victim: PlayerState, occupied: Set<number>) {
+        const s = this.state.tiles.find(t => t.id === source.tileId), v = this.state.tiles.find(t => t.id === victim.tileId);
+        if (!s || !v)
+            return null;
+        const vx = v.q - s.q, vy = v.r - s.r;
+        const opts = neighbors(v, this.state.tiles).filter(t => !occupied.has(t.id));
+        if (!opts.length)
+            return null;
+        opts.sort((a, b) => ((b.q - v.q) * vx + (b.r - v.r) * vy) - ((a.q - v.q) * vx + (a.r - v.r) * vy));
+        return opts[0].id;
+    }
     private scheduleExistingBotsReady() { for (const bot of this.botPlayers()) {
         bot.ready = false;
         const delay = randBetween(BOT_READY_MIN_MS, BOT_READY_MAX_MS);

@@ -1,61 +1,72 @@
-# Tiles V0.5 — Public Arcade Build
+# Tiles V0.6 — Fluid Movement + Adaptive Arcade UI
 
-Tiles is a realtime multiplayer browser party game by Apogee Lab. V0.5 turns the prior private-room prototype into a much more complete arcade game: public Quick Play, server-controlled bots, committed matchmaking countdowns, Bubble collisions, deterministic collision recovery, a new logo, and dedicated phone layouts.
+Tiles is a realtime multiplayer browser party game by Apogee Lab. V0.6 keeps the public matchmaking/bot systems from V0.5.3, replaces normal player collision physics with deterministic tile-occupancy movement, and introduces a deliberate three-environment UI system that fits itself to the usable browser/PWA viewport.
 
 ## Architecture
 
 - React 19 + TypeScript + Vite client
 - HTML Canvas arena renderer
-- Cloudflare Worker HTTP/router layer
-- One `GameRoom` Durable Object per match room
-- One global `Matchmaker` Durable Object for public-room discovery
-- WebSockets for authoritative realtime room state
-- No D1 required
+- Cloudflare Worker
+- `GameRoom` Durable Object per room
+- global `Matchmaker` Durable Object for public-room discovery
+- WebSockets with server-authoritative room/game state
+- no D1 required for active gameplay
 
-## Major V0.5 systems
+## V0.6 highlights
 
-### Quick Play / public rooms
+### Fluid movement / occupancy
 
-`QUICK PLAY` searches open public rooms and creates one when none are available. Public rooms always use bot filling and always lock a five-character roster before gameplay.
+Normal moving players no longer generate collision events. Characters may visually slide around each other while travelling. A player may select an already occupied destination; the server only resolves occupancy when the movement step reaches that tile.
 
-Created groups support:
+- direct swaps are allowed when both players vacate simultaneously
+- same-target arrivals are deterministic: earliest authoritative arrival wins, then stable player id tie-break
+- an occupied final destination blocks entry without knockback/recoil
+- an occupied intermediate route cell triggers a reroute around that cell
+- the selected destination receives a local-only glowing hex outline
 
-- Public — discoverable, bot-enabled, five-character matches
-- Private + Fill With Bots ON — five-character matches, including solo + four bots
-- Private + Fill With Bots OFF — human-only matches with 2–5 players
+### Bubble
 
-Bots remain server-internal as a player type; the normal gameplay state does not expose per-player bot labels.
+Bubble remains the deliberate exception to normal occupancy. If a Bubble-active player reaches a tile still occupied by a non-Bubble player, the server tries to displace the occupant to the best valid adjacent tile and lets the Bubble player claim the target. Bubble-vs-Bubble cannot displace either player.
 
-### Lobby timing
+### Three explicit UI environments
 
-- First synthetic player in a bot-enabled lobby: 4.6 seconds after the first human arrives
-- Subsequent synthetic joins: random 3.6–4.6 second intervals
-- Human arrivals replace an existing bot before consuming a new visible slot
-- When the roster/start requirements are met, the eight-second countdown is committed and never cancels
-- Humans may continue replacing bots during the committed countdown
-- At zero, bot-enabled rooms are force-filled to exactly five characters and roster-locked
+A client-side viewport controller chooses one layout:
 
-### Collision rewrite
+1. Desktop
+2. Mobile landscape
+3. Mobile portrait
 
-Collision outcomes are now created server-side as deterministic collision events. Each event carries its start/end timestamps, partner, role, and preselected recovery tile. Recovery tiles are treated as temporary reservations while the event runs. The same player pair receives a short post-collision cooldown to prevent immediate collision loops.
+It also measures `window.visualViewport` and detects standalone/Home Screen mode. CSS variables (`--viewport-width`, `--viewport-height`, `--ui-scale`) let each layout fit the actual usable screen instead of assuming Safari and an installed PWA expose the same height.
 
-The Canvas client animates the authoritative event with multiple impact/recoil/recovery stages instead of procedural shake-only feedback.
+### Arcade presentation
 
-### Bubble power-up
+- permanent sparse tile-color shooting-star particles behind the interface
+- glowing/sparking floating tiles on desktop and mobile-landscape landing screens
+- static pixel-confetti treatment around every Tiles logo
+- real Apogee Lab logo next to the homepage brand link
+- redesigned two-page tutorial with character cues and expandable Add to Home Screen instructions
 
-Bubble lasts four seconds on the server with no HUD countdown. The active character receives a translucent energy bubble. Contact with a non-Bubble player knocks the victim one valid adjacent tile in the impact direction (or applies recoil if no adjacent tile is available). Bubble-vs-Bubble uses normal collision behavior.
+## Public matchmaking retained from V0.5
+
+- Quick Play
+- public/private group creation
+- optional private bot fill
+- staged public bot joins
+- human-over-bot replacement before roster lock
+- committed eight-second start countdown
+- exactly five characters for public / bot-enabled matches
+- server-private bot identity
+- selector fairness and V0.5.3 visual wheel synchronization
 
 ## Cloudflare build settings
 
 - Build command: `npm run build`
 - Deploy command: `npx wrangler deploy`
 
-V0.5 adds a second Durable Object binding:
+Bindings:
 
 - `GAME_ROOMS (GameRoom)`
 - `MATCHMAKER (Matchmaker)`
-
-Both are declared with SQLite storage in `wrangler.jsonc` using Cloudflare's declarative `exports` configuration.
 
 ## Local commands
 
@@ -67,18 +78,13 @@ npm run dev
 
 ## Runtime assets
 
-Production assets live in `public/`. The permanent title logo is:
+Production assets live in `public/`.
 
-`public/assets/tiles-logo.png`
+- Tiles logo: `public/assets/tiles-logo.png`
+- Apogee Lab mark: `public/assets/apogee-lab-logo.png`
+- character sheets: `public/assets/characters/`
+- tile atlas: `public/assets/tiles/hex-atlas.png`
+- powerups: `public/assets/powerups.png`
+- music: `public/audio/retro-arcade-theme.mp3`
 
-Design and regression screenshots are retained in `art-reference/`, including the mobile layout screenshots used for the V0.5 responsive rewrite.
-
-## Music
-
-Runtime music:
-
-`public/audio/retro-arcade-theme.mp3`
-
-License evidence:
-
-`licenses/retro-arcade-theme-license.png`
+Reference art and the mobile/browser screenshots used for the V0.6 layout rewrite are retained in `art-reference/`.

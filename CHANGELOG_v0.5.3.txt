@@ -1,0 +1,7 @@
+Tiles v0.5.3 — Selector Wheel Sync Hotfix
+
+- Fixed selector wheel landing on a different player color than the server-authoritative chooser.
+- Corrected the 90-degree coordinate offset between the conic-gradient origin and the fixed top pointer.
+- The wheel target is now derived directly from authoritative selectorId and its exact candidate wedge center.
+- Wheel spin animation settles before the 4-second selector-wheel phase ends, giving the result a short visible hold.
+- No gameplay fairness or chooser-selection rules changed.

@@ -1,90 +1,103 @@
-# Tiles V0.5 locked gameplay specification
+# Tiles V0.6 locked gameplay + interface specification
 
 ## Match formats
 
-- Quick Play: public matchmaking, bots enabled, always five characters at match start.
-- Created Public: matchmaking enabled, bots enabled, always five characters at match start.
-- Private + bots ON: matchmaking disabled, bot-filled to five characters; one human may play.
-- Private + bots OFF: matchmaking disabled, no bots, 2–5 human players.
+- Quick Play: public, bot-enabled, exactly five characters at match start.
+- Created Public: discoverable, bot-enabled, exactly five characters.
+- Private + bots ON: bot-filled to five; one human may play.
+- Private + bots OFF: 2–5 humans, no bots.
 
-## Ready threshold
+## Movement
 
-Bots never count toward the readiness threshold. Human votes required:
+- 19-cell hexagonal board; six floor colors.
+- Movement phase is approximately seven seconds.
+- Tap/click a tile and the server computes a route.
+- An occupied destination is a valid selection.
+- Player proximity while moving is not a collision condition.
+- The client may apply a small visual-only perpendicular slide/rotation when two moving sprites pass closely.
+- Tile occupancy is resolved only when a player reaches a movement step.
+- If two players reach the same empty tile, the first authoritative arrival wins; stable player id breaks an exact timestamp tie.
+- Direct swaps/cycles are permitted when every participant vacates its current tile in the same authoritative resolution.
+- If a requested final tile is still occupied, the arriving player stops outside it and the route ends.
+- If an intermediate cell is occupied, the server attempts to reroute around that cell.
+- No normal knockback, recoil, stun, collision cooldown, or collision-loop state exists.
 
-- 1 human → 1 ready
-- 2 humans → 2 ready
-- 3 humans → 2 ready
-- 4 humans → 3 ready
-- 5 humans → 3 ready
+## Local destination feedback
 
-Equivalent rule for N >= 2: `floor(N / 2) + 1`.
+The tile selected by the local player receives a subtle pulsing gold/white edge glow. This cue is client-only and is never broadcast to other players. It clears on arrival, blocked completion, elimination, or phase change.
 
-Once the eight-second final countdown begins, the start is committed. Joins, leaves, replacements, host changes, or later readiness changes do not cancel it.
-
-## Public bot fill
-
-- First bot joins after exactly 4.6 seconds when the first human creates/enters an empty bot-enabled lobby.
-- Further bots join after independent random 3.6–4.6 second intervals.
-- Before roster lock, a real human replaces an existing bot instead of increasing the visible player count.
-- At countdown zero, bot-enabled rooms fill any remaining vacancies immediately and lock the roster.
-- Per-player bot identity is server-private and not shown in normal UI/state.
-- Bot names come from a fixed ~200-name arcade/gamer pool with collision avoidance against visible room names.
-
-## Arena / movement
-
-- 19-cell hexagonal arena.
-- Six floor colors: red, orange, yellow, green, blue, violet.
-- Board colors regenerate every round with bounded uneven randomness.
-- Tap/click a reachable tile; the server computes the route.
-- One player per logical tile.
-- Movement phase: ~7 seconds.
-- Bots choose 2–6 waypoint destinations distributed across the movement window and use the same pathfinding/collision system as humans.
-
-## Collision system
-
-- Collision outcomes are decided server-side when impact is detected.
-- Each event receives a unique collision ID, partner, role, timestamps, and a reserved resolution tile.
-- Head-on collisions use two distinct preselected sidestep/recovery positions.
-- Same-target/glancing collisions deterministically assign priority/yield behavior.
-- A pair-specific cooldown prevents an immediately repeated collision between the same two players.
-- Third players are routed around active collision recovery reservations.
-- Client animation uses staged approach → impact → recoil → curved sidestep/recovery → resume movement.
-- Original destinations are preserved and routes are recomputed after recovery.
-
-## Power-ups
-
-Maximum one held item.
-
-### Speed
-
-Temporary movement-speed increase.
-
-### Bubble
+## Bubble
 
 - Manual movement-phase activation.
-- Four-second server-authoritative duration.
-- No numeric countdown UI.
-- Visible translucent energy bubble around the character.
-- Bubble vs normal player: victim is knocked one adjacent valid tile in the impact direction; nearest valid fallback is used when needed.
-- If no displacement tile is valid, the victim receives recoil but stays put.
-- Knocked players can collect a power-up on their landing tile if their slot is empty.
-- Bubble vs Bubble: normal collision rules.
+- Four seconds, server authoritative, no numeric HUD countdown.
+- Visible translucent sphere remains around the active character.
+- When a Bubble player attempts to enter a tile occupied by a non-Bubble player, the victim is displaced one valid adjacent tile if possible and Bubble claims the original tile.
+- Preferred displacement direction is away from the Bubble source; nearest valid adjacent fallback is used.
+- If no valid adjacent tile exists, Bubble cannot enter and no overlap is allowed.
+- Bubble-vs-Bubble behaves like a normally occupied tile.
+- A displaced player can collect a powerup on the landing tile and resumes its previous destination when a route remains.
+
+## Other powerups
+
+### Speed
+Temporary movement-speed increase.
 
 ### Phase Shift
-
-During the 1.15-second doomed-color reveal, a threatened player may activate Phase Shift to teleport to a random safe unoccupied non-doomed tile.
+During the 1.15-second doomed-color reveal, teleports a threatened player to a random safe unoccupied non-doomed tile.
 
 ## Selector
 
 - Modified-random fairness cycle retained.
 - Eliminated players are skipped.
-- Bots wait 0.75–2.5 seconds, then choose a random color other than the color beneath themselves.
-- Other players see the selected player's actual name in the choosing overlay.
+- Bots wait 0.75–2.5 seconds before choosing.
+- Bots avoid intentionally choosing the color directly beneath themselves.
+- V0.5.3 wheel geometry remains authoritative: the wheel always lands on the server-selected chooser.
 
-## Elimination / win
+## Interface environments
 
-- One life per match.
-- Falling is caused by selected-color tile collapse, not the arena perimeter.
-- Eliminated players spectate.
-- Last survivor receives one session trophy.
-- Trophy counts persist across rematches for the room/session.
+The client selects exactly one main composition:
+
+- desktop
+- mobile landscape
+- mobile portrait
+
+The environment controller measures `visualViewport` when available, detects standalone/Home Screen display mode, and exposes the current usable width/height and UI scale through CSS variables. Browser chrome, orientation changes, and viewport resize events trigger recalculation.
+
+### Mobile invariants
+
+- no required page scrolling for gameplay controls
+- safe-area insets protect Dynamic Island/notch/home indicator
+- Ready and Leave Room remain simultaneously reachable in lobby/rematch states
+- arena gets priority over decoration
+- decorative elements disappear/reduce before functional UI is compressed beyond usability
+- native browser mode may use a tighter scale than the installed PWA on the same phone
+
+## Tutorial
+
+Page 1:
+
+1. Tap a tile to move to it.
+2. Pick a color to eliminate.
+3. Be the last one standing.
+
+Page 2 title: `POWERUPS`
+
+Shows Speed, Bubble, Phase Shift and the text:
+
+`Pick up powerups while you move, and click them to activate them.`
+
+On eligible mobile browser sessions, show a prominent expandable callout:
+
+`ADD TO HOME SCREEN FOR BETTER GAMEPLAY` / `SHOW ME HOW`
+
+Final CTA: `LET'S GO`.
+
+Tutorial navigation includes a character cue beside Next and a different playful character pose by the final CTA.
+
+## Branding / background
+
+- final PNG Tiles logo everywhere
+- static six-color pixel confetti from both lower logo corners
+- sparse tile-color shooting-star particles behind all UI
+- landing floating tiles receive matching glow, halo and pixel-spark effects on desktop and mobile landscape
+- small clickable Apogee Lab mark + text on the homepage

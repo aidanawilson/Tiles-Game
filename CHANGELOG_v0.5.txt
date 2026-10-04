@@ -59,3 +59,12 @@ GUI / MOBILE
 
 VALIDATION NOTE
 - Client and server TypeScript were checked with local declaration stubs because this workspace could not complete an npm registry install. Run `npm install && npm run check` in the normal repo/Cloudflare environment before production deployment.
+
+V0.5.1 CI HOTFIX
+- Added src/client/vite-env.d.ts with Vite client types and an explicit CSS side-effect import declaration.
+- Fixes GitHub Actions TS2882 on `import "./styles.css"` during the client typecheck.
+- No gameplay, networking, art, layout, or matchmaking behavior changed.
+
+V0.5.2 hotfix
+- Fixed eliminated players briefly reappearing during later tile-drop/reveal animations.
+- Reveal rendering now includes only currently alive players; players standing on the newly doomed color remain alive until the server resolves that reveal, so their intended fall animation is preserved.

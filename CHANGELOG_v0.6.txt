@@ -1,0 +1,31 @@
+Tiles V0.6
+==========
+
+Gameplay
+- Replaced normal proximity collision system with destination-tile occupancy resolution.
+- Occupied tiles can now be selected as destinations.
+- Added deterministic same-target first-arrival winner behavior.
+- Added simultaneous swap/cycle support.
+- Removed normal recoil/stun/collision-loop states.
+- Added visual-only moving-player slide-past behavior.
+- Preserved Bubble as the only forced occupied-tile takeover mechanic.
+- Added local-only selected destination hex glow.
+
+Responsive UI
+- Added runtime visualViewport measurement and standalone/PWA detection.
+- Added explicit desktop, mobile-landscape and mobile-portrait layouts.
+- Added adaptive --ui-scale and usable viewport CSS variables.
+- Tightened safe-area handling and top margins.
+- Added overflow protections for landing code/join controls.
+
+Presentation
+- Added permanent sparse tile-color shooting-star background particles.
+- Added glow/halo/pixel sparks to floating landing tiles.
+- Added static logo confetti treatment.
+- Added Apogee Lab logo to homepage brand link.
+- Rebuilt tutorial copy/layout, powerup page, Add to Home Screen disclosure and CTA mascots.
+
+Retained
+- V0.5.3 selector wheel sync fix.
+- V0.5 public matchmaking, bots and committed countdown behavior.
+- V0.5.2 eliminated-player tile-drop rendering fix.

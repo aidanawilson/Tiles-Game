@@ -1,95 +1,91 @@
-# Tiles V0.5 test checklist
+# Tiles V0.6 test checklist
 
 ## Build / deploy
 
-1. Run `npm install`.
-2. Run `npm run check`.
-3. Deploy with `npx wrangler deploy`.
-4. Confirm Cloudflare reports both bindings: `GAME_ROOMS (GameRoom)` and `MATCHMAKER (Matchmaker)`.
-5. Smoke-test the workers.dev URL before changing the production custom domain.
+1. `npm install`
+2. `npm run check`
+3. `npx wrangler deploy`
+4. Confirm `GAME_ROOMS` and `MATCHMAKER` bindings.
+5. Smoke-test workers.dev before custom-domain rollout.
 
-## Quick Play / matchmaking
+## Movement / occupancy regression
 
-1. Open a clean browser/device and press Quick Play.
-2. Confirm the room begins with the human player only.
-3. Confirm the first additional visible player appears roughly 4.6 seconds later.
-4. Confirm subsequent additions are staggered rather than simultaneous.
-5. Confirm the final roster reaches 5/5.
-6. Confirm the final countdown runs for eight seconds.
-7. Repeat with a second real device joining during bot fill and confirm it replaces a bot without increasing the visible count.
-8. Join during the eight-second countdown and confirm the countdown does not reset.
-9. Leave during the eight-second countdown and confirm the countdown does not reset.
-10. At zero, confirm the gameplay roster has exactly five characters.
+1. Click a tile currently occupied by a stationary second player.
+2. Confirm the first player walks all the way toward it, then stops outside if the occupant remains.
+3. Move the occupant away before arrival and confirm the incoming player enters normally.
+4. Send two players directly through one another and confirm they visually slide past without recoil/stun/server collision state.
+5. Make two players swap starting tiles and confirm both complete the swap.
+6. Make two players arrive at the same empty tile simultaneously; confirm one deterministic winner and no overlap.
+7. Route through a stationary occupied intermediate tile and confirm rerouting rather than collision looping.
+8. Rapidly retarget while moving and confirm movement remains responsive.
 
-## Private modes
+## Destination glow
 
-- Private / Bots OFF: one human cannot start; 2–5 humans can start using the human readiness threshold.
-- Private / Bots ON: one human can ready, bots fill the lobby, and the match starts with five characters.
-- Public created group: discoverable to Quick Play and bot-enabled.
-
-## Ready voting
-
-Verify required human ready votes: 1/1, 2/2, 2/3, 3/4, 3/5. Bots must never change the requirement.
-
-## Collision regression
-
-1. Intentionally send two players head-on repeatedly.
-2. Confirm a collision produces one coherent impact/recovery event instead of repeated bouncing.
-3. Confirm both players end on distinct tiles.
-4. Confirm they resume their original destinations after recovery when a route remains available.
-5. Create repeated same-target collisions and verify deterministic priority/yield behavior.
-6. Confirm a third player does not enter a tile reserved for another pair's collision recovery.
-7. Rapidly tap new destinations near impact and confirm collision commitment cannot create an infinite loop.
+- local clicked tile receives a subtle pulsing edge glow immediately
+- only the selecting client sees it
+- selecting a new tile moves the glow
+- it clears after arrival, blocked completion, phase change or elimination
 
 ## Bubble
 
-1. Collect Bubble and activate during movement.
-2. Confirm the visible bubble persists for about four seconds with no numeric timer.
-3. Hit a non-Bubble player and confirm they are displaced one valid neighboring tile when possible.
-4. Confirm the victim cannot be knocked outside the arena.
-5. Confirm Bubble-vs-Bubble uses normal collision behavior.
-6. Confirm a knocked player can collect an item on the landing tile when their inventory is empty.
+1. Activate Bubble and target an occupied non-Bubble player's tile.
+2. Confirm the occupant moves to a valid adjacent tile and Bubble claims the original tile.
+3. Confirm the victim is never pushed outside the 19-cell board.
+4. Block all adjacent victim tiles and confirm Bubble is denied entry rather than overlapping.
+5. Bubble-vs-Bubble: confirm neither is displaced.
+6. Confirm displaced player can collect a powerup on its landing tile and can resume a remaining destination.
 
-## Bot behavior
+## Viewport / environment matrix
 
-- Bots move through 2–6 destinations rather than staying still.
-- Bots collide and collect power-ups through normal rules.
-- Bot selector waits visibly before choosing.
-- Bot selector never intentionally chooses the color directly under itself.
-- Phase Shift is used when a bot is threatened and holds it.
-- No UI displays a BOT label, icon, counter, or per-player bot disclosure.
-- Visible names do not duplicate bot names within the room.
+Test each in both lobby and live game:
 
-## Mobile landscape regression
+- desktop browser
+- iPhone portrait Safari
+- iPhone landscape Safari with browser chrome visible
+- iPhone portrait Home Screen PWA
+- iPhone landscape Home Screen PWA
+- Android portrait browser if available
+- Android landscape browser if available
 
-On a notched/Dynamic-Island iPhone in landscape:
+For every mobile case:
 
-- No page scrolling is necessary.
-- Power-up panel is left, arena center, players right.
-- No content is under the Dynamic Island/notch.
-- READY and LEAVE ROOM are simultaneously visible in the lobby.
-- Landing menu fits inside the viewport.
-- Floating tile/character decorations remain visible around the landing panel.
+- no essential control is offscreen
+- no page scrolling is needed for gameplay
+- Dynamic Island/notch/home indicator covers no functional element
+- top margin is compact rather than oversized
+- landing code input + Join button remain within the panel
+- landscape order is Power-Up | Arena | Players
+- portrait uses player strip → arena → compact powerup
+- lobby shows Ready and Leave Room together
+- resize/browser toolbar changes do not permanently misalign the interface
 
-## Mobile portrait regression
+## Tutorial
 
-- No landscape-recommendation banner appears.
-- The top hardware-safe area remains empty enough that the camera island/notch covers nothing important.
-- Landing panel is centered.
-- Lobby player state, arena, compact power-up panel, READY, and LEAVE ROOM are all reachable without page scrolling.
+- page 1 displays the three exact steps from `GAME_SPEC.md`
+- character visibly cues the Next button
+- page 2 says POWERUPS and shows Speed/Bubble/Phase Shift
+- exact pickup/activation sentence appears
+- Add to Home Screen callout is prominent on eligible native mobile browser sessions
+- Show Me How expands/collapses instructions
+- final button says LET'S GO
+- final character treatment is different from page 1
+- buttons remain reachable in portrait and short landscape browser viewports
 
-## UI / art
+## Presentation
 
-- Permanent PNG Tiles logo is used rather than CSS letter rendering.
-- Room-code badge has gold framing; tapping it copies only the four-character code and shows `COPIED TO CLIPBOARD` for about one second.
-- No Copy Invite Link button remains.
-- Player cards use the actual player color for the card frame and larger portrait sprite.
-- Major panels use the new gold ornamental arcade frame language.
-- Landing footer no longer shows `2–5 PLAYERS · NO ACCOUNTS · ROOM CODE MULTIPLAYER`.
-- Background particles/stars remain sparse and do not interfere with gameplay.
+- sparse colored shooting stars appear behind all screens and never capture pointer input
+- floating landing tiles glow and emit subtle pixel sparks on desktop/landscape
+- portrait hides landing floating islands
+- every Tiles logo has static lower-corner confetti
+- homepage Apogee Lab logo/text is small, clickable and opens apogeelab.org
+- reduced-motion mode disables continuous decorative animation
 
-## Audio
+## Existing systems regression
 
-- Trimmed music loops without the former trailing silent gap.
-- Music begins after user interaction when autoplay restrictions apply.
-- Mute preference persists locally.
+- Quick Play bot-fill timing still works
+- humans still replace bots before roster lock
+- committed eight-second countdown does not reset
+- public/bot-enabled matches still begin with five characters
+- selector wheel visual result matches authoritative chooser
+- tile drop never resurrects previously eliminated players
+- trimmed music loops and mute preference persists
