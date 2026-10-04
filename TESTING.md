@@ -1,53 +1,95 @@
-# Tiles V0.3 test checklist
+# Tiles V0.5 test checklist
 
-## Deployment smoke test
+## Build / deploy
 
-1. Push the complete repo to GitHub.
-2. Let the connected Cloudflare Worker build with `npm run build` and deploy with `npx wrangler deploy`.
-3. Confirm the deployment reports the `GAME_ROOMS (GameRoom)` Durable Object binding.
-4. Open the workers.dev URL before attaching/changing the production subdomain.
+1. Run `npm install`.
+2. Run `npm run check`.
+3. Deploy with `npx wrangler deploy`.
+4. Confirm Cloudflare reports both bindings: `GAME_ROOMS (GameRoom)` and `MATCHMAKER (Matchmaker)`.
+5. Smoke-test the workers.dev URL before changing the production custom domain.
 
-## Two-device test
+## Quick Play / matchmaking
 
-1. Create a room on desktop.
-2. Join from an iPhone/Android device.
-3. Confirm each player receives a different character color.
-4. Ready both players and start.
-5. Tap distant tiles rapidly; movement should be visually continuous rather than stopping at every hex.
-6. Confirm both devices show the same player locations and round result.
+1. Open a clean browser/device and press Quick Play.
+2. Confirm the room begins with the human player only.
+3. Confirm the first additional visible player appears roughly 4.6 seconds later.
+4. Confirm subsequent additions are staggered rather than simultaneous.
+5. Confirm the final roster reaches 5/5.
+6. Confirm the final countdown runs for eight seconds.
+7. Repeat with a second real device joining during bot fill and confirm it replaces a bot without increasing the visible count.
+8. Join during the eight-second countdown and confirm the countdown does not reset.
+9. Leave during the eight-second countdown and confirm the countdown does not reset.
+10. At zero, confirm the gameplay roster has exactly five characters.
 
-## Visual test
+## Private modes
 
-- 19 extruded hex tiles are visible and easy to tap.
-- Tile colors reshuffle every round.
-- Player sprites animate while idle and moving.
-- Player color in the right-side list matches the arena sprite.
-- The selector wheel removes eliminated players and uses only eligible player colors.
-- The color selector popup has six colors and no extra Tiles logo.
-- The doomed floor visibly progresses through warning/crack/drop states.
-- The UI has no permanent countdown timer or MOVE PHASE banner.
+- Private / Bots OFF: one human cannot start; 2–5 humans can start using the human readiness threshold.
+- Private / Bots ON: one human can ready, bots fill the lobby, and the match starts with five characters.
+- Public created group: discoverable to Quick Play and bot-enabled.
 
-## iPhone landscape tutorial regression test
+## Ready voting
 
-1. Open on an iPhone in Safari or Home Screen mode.
-2. Rotate to landscape before/during the tutorial.
-3. Confirm tutorial content may scroll internally if necessary.
-4. Confirm SKIP/NEXT/BACK/I'M READY remain reachable.
-5. Confirm tutorial says Tap, not keyboard/key language.
+Verify required human ready votes: 1/1, 2/2, 2/3, 3/4, 3/5. Bots must never change the requirement.
 
-## iOS reconnect regression test
+## Collision regression
 
-1. Join a room from an iPhone Home Screen installation.
-2. Note the player's name, color, and trophy count.
-3. Close the web app completely.
-4. Reopen and return/resume the same room within 45 seconds.
-5. Confirm the original seat is reclaimed.
-6. Confirm there is NOT a duplicate player with the same name.
-7. Confirm the same character color and trophy count are preserved.
+1. Intentionally send two players head-on repeatedly.
+2. Confirm a collision produces one coherent impact/recovery event instead of repeated bouncing.
+3. Confirm both players end on distinct tiles.
+4. Confirm they resume their original destinations after recovery when a route remains available.
+5. Create repeated same-target collisions and verify deterministic priority/yield behavior.
+6. Confirm a third player does not enter a tile reserved for another pair's collision recovery.
+7. Rapidly tap new destinations near impact and confirm collision commitment cannot create an infinite loop.
+
+## Bubble
+
+1. Collect Bubble and activate during movement.
+2. Confirm the visible bubble persists for about four seconds with no numeric timer.
+3. Hit a non-Bubble player and confirm they are displaced one valid neighboring tile when possible.
+4. Confirm the victim cannot be knocked outside the arena.
+5. Confirm Bubble-vs-Bubble uses normal collision behavior.
+6. Confirm a knocked player can collect an item on the landing tile when their inventory is empty.
+
+## Bot behavior
+
+- Bots move through 2–6 destinations rather than staying still.
+- Bots collide and collect power-ups through normal rules.
+- Bot selector waits visibly before choosing.
+- Bot selector never intentionally chooses the color directly under itself.
+- Phase Shift is used when a bot is threatened and holds it.
+- No UI displays a BOT label, icon, counter, or per-player bot disclosure.
+- Visible names do not duplicate bot names within the room.
+
+## Mobile landscape regression
+
+On a notched/Dynamic-Island iPhone in landscape:
+
+- No page scrolling is necessary.
+- Power-up panel is left, arena center, players right.
+- No content is under the Dynamic Island/notch.
+- READY and LEAVE ROOM are simultaneously visible in the lobby.
+- Landing menu fits inside the viewport.
+- Floating tile/character decorations remain visible around the landing panel.
+
+## Mobile portrait regression
+
+- No landscape-recommendation banner appears.
+- The top hardware-safe area remains empty enough that the camera island/notch covers nothing important.
+- Landing panel is centered.
+- Lobby player state, arena, compact power-up panel, READY, and LEAVE ROOM are all reachable without page scrolling.
+
+## UI / art
+
+- Permanent PNG Tiles logo is used rather than CSS letter rendering.
+- Room-code badge has gold framing; tapping it copies only the four-character code and shows `COPIED TO CLIPBOARD` for about one second.
+- No Copy Invite Link button remains.
+- Player cards use the actual player color for the card frame and larger portrait sprite.
+- Major panels use the new gold ornamental arcade frame language.
+- Landing footer no longer shows `2–5 PLAYERS · NO ACCOUNTS · ROOM CODE MULTIPLAYER`.
+- Background particles/stars remain sparse and do not interfere with gameplay.
 
 ## Audio
 
-- Music starts only after a user interaction if autoplay is blocked.
-- Music loops without restarting each round.
-- Mute button works.
-- Mute choice persists on the device.
+- Trimmed music loops without the former trailing silent gap.
+- Music begins after user interaction when autoplay restrictions apply.
+- Mute preference persists locally.

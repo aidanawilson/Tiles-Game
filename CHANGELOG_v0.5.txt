@@ -1,0 +1,61 @@
+Tiles v0.5 — public matchmaking, bots, Bubble, collision rewrite, and responsive arcade GUI
+
+SERVER / MATCHMAKING
+- Added global Matchmaker Durable Object.
+- Added Quick Play endpoint and client flow.
+- Added Public and Private room modes.
+- Added private Fill With Bots toggle.
+- Public/Quick Play and bot-enabled private matches force a five-character roster.
+- Added hidden server-side bot identity tracking without per-player bot fields in public game state.
+- Added ~200 generated preset bot names with room collision avoidance.
+- Added organic bot-fill timing: first at 4.6s, further joins at 3.6–4.6s.
+- Real humans replace bots before roster lock, including during the final countdown.
+- Added human-only ready-vote threshold logic.
+- Added committed eight-second start countdown that never cancels once started.
+- Added final fill-to-five and roster lock at countdown zero.
+
+BOT GAMEPLAY
+- Bots choose 2–6 movement waypoints per movement phase.
+- Bots use the same pathfinding, collision, power-up pickup, elimination, and selector systems as humans.
+- Bot selector delay: random 0.75–2.5s.
+- Bot selector excludes its current tile color.
+- Bots can use Speed, Bubble, and threatened Phase Shift.
+- Bots visually ready on staggered delays while never counting toward the human readiness threshold.
+
+COLLISIONS
+- Replaced shake-only collision resolution with server-authored collision events.
+- Added unique collision IDs, start/end times, partners, roles, and preselected recovery tiles.
+- Added collision recovery tile reservations.
+- Added pair-specific collision cooldown to prevent infinite repeated collision loops.
+- Head-on collisions preselect distinct recovery/sidestep tiles.
+- Glancing/same-target collisions use deterministic priority/yield outcomes.
+- Client now renders staged impact/recoil/curved recovery motion using the collision sprite row.
+
+POWER-UPS
+- Added Bubble power-up.
+- Bubble lasts four seconds with no displayed numeric timer.
+- Added translucent animated bubble visual around active characters.
+- Bubble collisions knock normal players one valid neighboring tile when possible.
+- Bubble-vs-Bubble resolves as a normal collision.
+- Knocked players can collect a power-up on the landing tile.
+- Power-up spawn mix now includes Speed, Bubble, and rare Phase Shift.
+
+GUI / MOBILE
+- Replaced CSS text logo with the finalized transparent PNG logo.
+- Added floating character-on-hex landing decorations on desktop and phone landscape.
+- Removed the old landing footer feature text.
+- Added sparse drifting background stars/particles.
+- Replaced gray major panel borders with gold ornamental pixel-arcade framing.
+- Room code is now a gold framed tap/click target; it copies the code and shows a one-second confirmation toast.
+- Removed Copy Invite Link.
+- Player cards now use full player-color borders/glow and larger sprites; removed the vertical color bar.
+- Rebuilt mobile landscape as Power-Up | Arena | Players.
+- Added strict safe-area padding for notches/Dynamic Island.
+- Removed the portrait landscape-recommendation banner.
+- Added fixed no-scroll phone layouts.
+- Lobby mobile bottom bar is 50/50 READY and LEAVE ROOM.
+- Reworked portrait player list into compact five-column cards.
+- Landing panel is centered in portrait and compressed in short landscape.
+
+VALIDATION NOTE
+- Client and server TypeScript were checked with local declaration stubs because this workspace could not complete an npm registry install. Run `npm install && npm run check` in the normal repo/Cloudflare environment before production deployment.

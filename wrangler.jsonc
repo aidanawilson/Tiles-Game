@@ -9,19 +9,13 @@
   },
   "durable_objects": {
     "bindings": [
-      {
-        "name": "GAME_ROOMS",
-        "class_name": "GameRoom"
-      }
+      { "name": "GAME_ROOMS", "class_name": "GameRoom" },
+      { "name": "MATCHMAKER", "class_name": "Matchmaker" }
     ]
   },
   "exports": {
-    "GameRoom": {
-      "type": "durable-object",
-      "storage": "sqlite"
-    }
+    "GameRoom": { "type": "durable-object", "storage": "sqlite" },
+    "Matchmaker": { "type": "durable-object", "storage": "sqlite" }
   },
-  "observability": {
-    "enabled": true
-  }
+  "observability": { "enabled": true }
 }
