@@ -1,103 +1,152 @@
-# Tiles V0.6 locked gameplay + interface specification
+# Tiles V0.7 locked gameplay specification
 
 ## Match formats
 
-- Quick Play: public, bot-enabled, exactly five characters at match start.
-- Created Public: discoverable, bot-enabled, exactly five characters.
-- Private + bots ON: bot-filled to five; one human may play.
+- Quick Play: public, bot-enabled, five characters at match start.
+- Created Public: discoverable, bot-enabled, five characters.
+- Private + bots ON: filled to five; one human may play.
 - Private + bots OFF: 2–5 humans, no bots.
+- One life per match; last survivor wins. Session trophy totals persist between rematches.
 
 ## Movement
 
-- 19-cell hexagonal board; six floor colors.
-- Movement phase is approximately seven seconds.
-- Tap/click a tile and the server computes a route.
-- An occupied destination is a valid selection.
-- Player proximity while moving is not a collision condition.
-- The client may apply a small visual-only perpendicular slide/rotation when two moving sprites pass closely.
-- Tile occupancy is resolved only when a player reaches a movement step.
-- If two players reach the same empty tile, the first authoritative arrival wins; stable player id breaks an exact timestamp tie.
-- Direct swaps/cycles are permitted when every participant vacates its current tile in the same authoritative resolution.
-- If a requested final tile is still occupied, the arriving player stops outside it and the route ends.
-- If an intermediate cell is occupied, the server attempts to reroute around that cell.
-- No normal knockback, recoil, stun, collision cooldown, or collision-loop state exists.
+- 19-cell hexagonal arena with six floor colors.
+- Movement lasts exactly **7.0 seconds** and displays a server-authoritative tenths timer.
+- Tap/click any tile, including a currently occupied destination.
+- Server pathfinds and resolves occupancy only when a movement step arrives.
+- Moving characters do not create server collision events. The client may apply a small visual-only slide/rotation when sprites pass closely.
+- Direct swaps/cycles are legal when all involved players vacate together.
+- First authoritative arrival wins a simultaneous destination conflict; stable player id resolves an exact timestamp tie.
+- A still-occupied final destination blocks entry without recoil. An occupied intermediate step triggers rerouting when possible.
+- The selected destination gets a local-only pulsing edge glow.
 
-## Local destination feedback
+## Powerups
 
-The tile selected by the local player receives a subtle pulsing gold/white edge glow. This cue is client-only and is never broadcast to other players. It clears on arrival, blocked completion, elimination, or phase change.
+Inventory has one slot. A powerup is collected by physically reaching its board tile. Legal held powerups may be clicked/tapped; Space is the desktop shortcut.
 
-## Bubble
+### Invisibility
 
-- Manual movement-phase activation.
-- Four seconds, server authoritative, no numeric HUD countdown.
-- Visible translucent sphere remains around the active character.
-- When a Bubble player attempts to enter a tile occupied by a non-Bubble player, the victim is displaced one valid adjacent tile if possible and Bubble claims the original tile.
-- Preferred displacement direction is away from the Bubble source; nearest valid adjacent fallback is used.
-- If no valid adjacent tile exists, Bubble cannot enter and no overlap is allowed.
-- Bubble-vs-Bubble behaves like a normally occupied tile.
-- A displaced player can collect a powerup on the landing tile and resumes its previous destination when a route remains.
+- movement-phase activation only
+- hides the player's arena sprite from every other player for the rest of the round
+- owner sees a translucent self representation after a short pixel-glitch dissolve
+- does not change occupancy, movement, player-list identity, or selector eligibility
+- expires before the next shuffle
 
-## Other powerups
+### Override
 
-### Speed
-Temporary movement-speed increase.
+- movement-phase activation only
+- guarantees the activator is the next selector
+- authoritative selector id is still used by the normal wheel animation
+- activator alone sees the blue/electric Override wheel treatment
+- only one Override may exist across the entire match at once: on board, held, or pending
+- pending Override is consumed when its forced selector event reaches color reveal
 
 ### Phase Shift
-During the 1.15-second doomed-color reveal, teleports a threatened player to a random safe unoccupied non-doomed tile.
+
+- reveal-phase activation only while standing on the doomed color
+- reaction window is **1.65 seconds**
+- teleports to a random safe, unoccupied, non-doomed tile
+- visual identity: localized yellow lightning at the source, disappearance, lightning at the destination, reappearance
+
+## Round sequence
+
+1. Board shuffle: **1.2 s** total wave.
+2. Pre-round countdown: **3.0 s**.
+3. Movement: **7.0 s**.
+4. Selector wheel: **5.0 s** phase; wheel visually spins/decelerates for ~4.55 s, then settles.
+5. Color selection: **5.0 s**.
+6. Doom reveal / Phase Shift window: **1.65 s**.
+7. Results beat: **1.65 s**.
+8. If multiple survivors remain, return to shuffle. Otherwise enter podium.
+
+### Shuffle presentation
+
+- all 19 physical hexes flip around a horizontal center axis
+- old face compresses away, new face rises from the midpoint
+- start times sweep left-to-right in screen space
+- each individual flip is ~280 ms
+- each tile finishes with a tiny settle bounce and quiet damped mechanical click
+- no midpoint flash
+
+### Pre-round cue
+
+- three short tones during the 3-second pause
+- GO tone exactly when movement unlocks
+- supported devices receive light matching haptics, with a stronger GO tap
+- board is fully readable while players are input-locked
 
 ## Selector
 
-- Modified-random fairness cycle retained.
-- Eliminated players are skipped.
-- Bots wait 0.75–2.5 seconds before choosing.
-- Bots avoid intentionally choosing the color directly beneath themselves.
-- V0.5.3 wheel geometry remains authoritative: the wheel always lands on the server-selected chooser.
+- modified-random fairness remains for normal rounds
+- Override temporarily supersedes fairness for exactly one selector event
+- visual landing is derived from the authoritative server-selected id
+- wedge crossings tick as the wheel turns; final landing gets a stronger clunk
+- selected player card pulses at landing
+- bots retain a randomized 0.75–2.5 s decision delay
+- selector may never deliberately choose its own current color when bot-controlled
 
-## Interface environments
+## Eliminations
 
-The client selects exactly one main composition:
+- doomed tiles crack/drop as complete 3D tiles
+- characters on them enter a panic/fall animation and descend into the hole with the tile
+- already-eliminated characters never render again in later drops
+- player card flickers/dims into eliminated state
 
-- desktop
-- mobile landscape
-- mobile portrait
+## Final Two
 
-The environment controller measures `visualViewport` when available, detects standalone/Home Screen display mode, and exposes the current usable width/height and UI scale through CSS variables. Browser chrome, orientation changes, and viewport resize events trigger recalculation.
+When exactly two survivors remain:
 
-### Mobile invariants
+- `FINAL TWO` pixel-art banner flashes during the existing pre-round countdown
+- particle intensity rises slightly
+- arena-frame glow strengthens
+- no extra gameplay delay is added
 
-- no required page scrolling for gameplay controls
-- safe-area insets protect Dynamic Island/notch/home indicator
-- Ready and Leave Room remain simultaneously reachable in lobby/rematch states
-- arena gets priority over decoration
-- decorative elements disappear/reduce before functional UI is compressed beyond usability
-- native browser mode may use a tighter scale than the installed PWA on the same phone
+## Match finish / podium / crown
+
+- final elimination transitions through a ~300 ms fade into a full-screen pixel-art podium scene
+- podium presentation lasts about three seconds inside a 3.6-second synchronized server phase
+- gamer tag remains above each podium character
+- podium base shows a pixel trophy + win count only when that player's session wins are greater than zero
+- first place receives a short victory dance
+- a small gold crown animates beside the latest winner's gamer tag and remains there in the next match until another player wins
+- after podium, room enters rematch state with a clear `REMATCH?` control
+
+## Bots-only endgame governor
+
+This activates only when no real human is alive and at least two bots remain.
+
+- roll `botGraceRounds` from 1–3
+- that many fully natural rounds may occur before a forced-progress selection attempt
+- after every bot death, reset the counter and roll again
+- if the previous grace value was 3, reroll any new 3 until the value is 1 or 2
+- forced selector choice prefers a color occupied by exactly one other bot
+- otherwise choose the occupied opponent color with the fewest bots
+- never intentionally choose the selector bot's own current color
+- if no legal opponent color exists, make a normal safe choice and keep forced progress pending
+- never reposition bots secretly to manufacture a death
 
 ## Tutorial
 
 Page 1:
-
 1. Tap a tile to move to it.
 2. Pick a color to eliminate.
 3. Be the last one standing.
 
 Page 2 title: `POWERUPS`
+- Invisibility
+- Override
+- Phase Shift
 
-Shows Speed, Bubble, Phase Shift and the text:
+Exact instruction: **Pick up powerups while you move, and click them to activate them.**
 
-`Pick up powerups while you move, and click them to activate them.`
+Eligible mobile-browser sessions show **ADD TO HOME SCREEN FOR BETTER GAMEPLAY / SHOW ME HOW** as an expandable callout. Page 1 and Page 2 use different-color characters standing beside and pointing toward the forward button. Final button is `LET'S GO`.
 
-On eligible mobile browser sessions, show a prominent expandable callout:
+## Interface / presentation rules
 
-`ADD TO HOME SCREEN FOR BETTER GAMEPLAY` / `SHOW ME HOW`
-
-Final CTA: `LET'S GO`.
-
-Tutorial navigation includes a character cue beside Next and a different playful character pose by the final CTA.
-
-## Branding / background
-
-- final PNG Tiles logo everywhere
-- static six-color pixel confetti from both lower logo corners
-- sparse tile-color shooting-star particles behind all UI
-- landing floating tiles receive matching glow, halo and pixel-spark effects on desktop and mobile landscape
-- small clickable Apogee Lab mark + text on the homepage
+- desktop, mobile landscape, and mobile portrait are explicit layouts
+- `visualViewport` and safe areas fit the UI to Safari/PWA usable space
+- no mobile scrolling is required for essential controls
+- all important new banners, timer digits, crown/trophy/rematch art, settings icon, and Override treatment are pixel-art/sprite-based
+- dynamic gamer tags remain text
+- all Tiles-logo confetti originates immediately at the lower logo corners
+- home screen settings owns Music, Sound FX, and feature-detected Haptics; no persistent floating mute control

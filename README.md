@@ -1,72 +1,89 @@
-# Tiles V0.6 — Fluid Movement + Adaptive Arcade UI
+# Tiles V0.7 — Sensory Arcade Update
 
-Tiles is a realtime multiplayer browser party game by Apogee Lab. V0.6 keeps the public matchmaking/bot systems from V0.5.3, replaces normal player collision physics with deterministic tile-occupancy movement, and introduces a deliberate three-environment UI system that fits itself to the usable browser/PWA viewport.
+Tiles is a realtime multiplayer browser party game by Apogee Lab. V0.7 focuses on the part of the project that makes a simple rule set feel like a finished game: readable timing, strategic powerups, satisfying between-round rhythm, stronger endgame presentation, and a faster rematch loop.
 
-## Architecture
+## Stack
 
-- React 19 + TypeScript + Vite client
+- React 19 + TypeScript + Vite
 - HTML Canvas arena renderer
 - Cloudflare Worker
-- `GameRoom` Durable Object per room
-- global `Matchmaker` Durable Object for public-room discovery
-- WebSockets with server-authoritative room/game state
-- no D1 required for active gameplay
+- one `GameRoom` Durable Object per room
+- one global `Matchmaker` Durable Object
+- WebSockets and server-authoritative game state
+- no D1 required for live matches
 
-## V0.6 highlights
+## V0.7 highlights
 
-### Fluid movement / occupancy
+### Strategic powerups
 
-Normal moving players no longer generate collision events. Characters may visually slide around each other while travelling. A player may select an already occupied destination; the server only resolves occupancy when the movement step reaches that tile.
+The powerup set is now **Invisibility / Override / Phase Shift**.
 
-- direct swaps are allowed when both players vacate simultaneously
-- same-target arrivals are deterministic: earliest authoritative arrival wins, then stable player id tie-break
-- an occupied final destination blocks entry without knockback/recoil
-- an occupied intermediate route cell triggers a reroute around that cell
-- the selected destination receives a local-only glowing hex outline
+- **Invisibility** hides the player's arena position from every other client for the rest of the round. The owner still sees a translucent/glitching self representation.
+- **Override** guarantees its owner is the next selector. At most one Override can exist across the board, inventories, or pending selector state at any time.
+- **Phase Shift** remains the emergency doomed-tile escape and now has a 1.65-second reaction window plus source/destination lightning effects.
+- Click/tap activates a legal held powerup; desktop players may also press **Space**.
 
-### Bubble
+### Round cadence
 
-Bubble remains the deliberate exception to normal occupancy. If a Bubble-active player reaches a tile still occupied by a non-Bubble player, the server tries to displace the occupant to the best valid adjacent tile and lets the Bubble player claim the target. Bubble-vs-Bubble cannot displace either player.
+A round now has explicit punctuation:
 
-### Three explicit UI environments
+`shuffle → pre-round countdown → 7.0 s movement → selector wheel → 5.0 s color choice → 1.65 s reveal → results`
 
-A client-side viewport controller chooses one layout:
+- movement and color-choice timers use a custom sprite-digit atlas and show tenths of a second
+- the pre-round sequence uses three short countdown tones followed by a brighter GO tone
+- supported devices receive matching light haptic cues
+- the board performs a left-to-right flip wave between rounds, with a tiny landing bounce and a damped mechanical click on each tile
 
-1. Desktop
-2. Mobile landscape
-3. Mobile portrait
+### Selector / elimination polish
 
-It also measures `window.visualViewport` and detects standalone/Home Screen mode. CSS variables (`--viewport-width`, `--viewport-height`, `--ui-scale`) let each layout fit the actual usable screen instead of assuming Safari and an installed PWA expose the same height.
+- selector wheel uses a longer final deceleration without turning the phase into dead time
+- wedge crossings receive light ticks and the final landing receives a stronger clunk
+- the selected player's card pulses at the actual landing moment
+- Override's electric-blue wheel treatment appears only to the player who used Override
+- doomed characters use a panic/fall pose and descend with the tile instead of disappearing abruptly
 
-### Arcade presentation
+### Final Two and victory loop
 
-- permanent sparse tile-color shooting-star particles behind the interface
-- glowing/sparking floating tiles on desktop and mobile-landscape landing screens
-- static pixel-confetti treatment around every Tiles logo
-- real Apogee Lab logo next to the homepage brand link
-- redesigned two-page tutorial with character cues and expandable Add to Home Screen instructions
+- at two survivors, `FINAL TWO` flashes during the existing pre-round countdown
+- background particles intensify slightly and the arena frame receives a stronger glow
+- the match ends in a full-screen pixel-art podium scene with a ~300 ms transition, about three seconds of presentation, trophy counts on podium bases, and a winner dance
+- the most recent winner receives the small gold crown beside their gamer tag; it remains through the next match until another player wins
+- the post-match action is a clear **REMATCH?** prompt while the room and session trophy totals remain intact
 
-## Public matchmaking retained from V0.5
+### Smarter bot-only endgames
 
-- Quick Play
-- public/private group creation
-- optional private bot fill
-- staged public bot joins
-- human-over-bot replacement before roster lock
-- committed eight-second start countdown
-- exactly five characters for public / bot-enabled matches
-- server-private bot identity
-- selector fairness and V0.5.3 visual wheel synchronization
+When no real human remains alive, a hidden pacing governor prevents endless bot stalemates without secretly moving bots.
+
+- a grace interval of 1–3 natural rounds is rolled after entering bot-only play and after every bot elimination
+- two grace intervals of 3 can never occur consecutively
+- once the grace interval expires, bot selectors prefer a color occupied by exactly one opponent, otherwise the least-populated opponent color
+- bots never intentionally select their own current tile color
+- if no legal opponent target exists, the bot makes a normal safe choice and the forced-progress requirement carries forward
+- normal 0.75–2.5 second bot decision delay is preserved
+
+### Home-screen settings
+
+The old persistent sound button is replaced by a small home-screen settings control for:
+
+- Music
+- Sound Effects
+- Haptics (only where the browser exposes vibration support)
+
+Preferences are stored locally.
+
+## Preserved systems
+
+V0.7 retains the V0.6 occupancy movement model, local destination glow, public Quick Play, private/public groups, staged bot filling, human-over-bot replacement, committed start countdown, selector fairness, responsive desktop/mobile-landscape/mobile-portrait layouts, `visualViewport` fitting, safe-area handling, background particles, ornamental frames, room-code copy behavior, reconnect identities, and session trophy counts.
 
 ## Cloudflare build settings
 
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
+- Build: `npm run build`
+- Deploy: `npx wrangler deploy`
 
 Bindings:
 
-- `GAME_ROOMS (GameRoom)`
-- `MATCHMAKER (Matchmaker)`
+- `GAME_ROOMS` → `GameRoom`
+- `MATCHMAKER` → `Matchmaker`
 
 ## Local commands
 
@@ -76,15 +93,4 @@ npm run check
 npm run dev
 ```
 
-## Runtime assets
-
-Production assets live in `public/`.
-
-- Tiles logo: `public/assets/tiles-logo.png`
-- Apogee Lab mark: `public/assets/apogee-lab-logo.png`
-- character sheets: `public/assets/characters/`
-- tile atlas: `public/assets/tiles/hex-atlas.png`
-- powerups: `public/assets/powerups.png`
-- music: `public/audio/retro-arcade-theme.mp3`
-
-Reference art and the mobile/browser screenshots used for the V0.6 layout rewrite are retained in `art-reference/`.
+The GitHub/Cloudflare production pipeline is the final dependency/build verification. This source package was also checked with strict TypeScript compiler passes using local declaration stubs because package-registry access was unavailable in the build environment that produced the ZIP.

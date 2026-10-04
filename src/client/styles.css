@@ -162,3 +162,99 @@ html[data-tiles-layout="mobile-portrait"] .logo-confetti{transform:scale(.7)}
 /* Use the actual runtime tile atlas for the decorative landing tiles. */
 .decor-hex{left:20px;bottom:3px;width:80px;height:72px;background-image:url('/assets/tiles/hex-atlas.png');background-repeat:no-repeat;background-size:600% 600%;background-position:0 var(--tile-row,40%);clip-path:none;box-shadow:none;filter:drop-shadow(0 10px 0 rgba(0,0,0,.32)) drop-shadow(0 0 8px color-mix(in srgb,var(--float-color) 32%,transparent))}
 html[data-tiles-layout="mobile-landscape"] .decor-hex{left:4px;bottom:-1px;width:80px;height:72px}
+
+/* v0.7 sensory-gameplay pass ------------------------------------------------ */
+.sound-toggle{display:none!important}
+
+/* Static logo confetti now physically originates at the logo corners. */
+.tiles-logo{padding-inline:10px}
+.logo-confetti{bottom:13%;}
+.confetti-left{left:calc(50% - min(176px,34%));box-shadow:-5px 2px 0 #ff5a57,-11px 7px 0 #51b8ff,-17px -2px 0 #5ce07a,-23px 10px 0 #a46cff,-8px 16px 0 #ff993c,-28px 18px 0 #ffd84f,-2px -7px 0 #a46cff}
+.confetti-right{right:calc(50% - min(176px,34%));box-shadow:5px 2px 0 #51b8ff,11px 7px 0 #ff993c,17px -2px 0 #a46cff,23px 10px 0 #5ce07a,8px 16px 0 #ff5a57,28px 18px 0 #ffd84f,2px -7px 0 #5ce07a}
+
+/* Home-only settings. */
+.settings-button{position:fixed;z-index:12;top:max(14px,calc(env(safe-area-inset-top) + 9px));right:max(14px,calc(env(safe-area-inset-right) + 9px));width:44px;height:44px;padding:5px;border:3px solid #8a7441;background:#0b1420;box-shadow:4px 4px 0 #02040a;image-rendering:pixelated}
+.settings-button img{width:100%;height:100%;image-rendering:pixelated}
+.settings-popover{position:fixed;z-index:14;top:max(64px,calc(env(safe-area-inset-top) + 57px));right:max(14px,calc(env(safe-area-inset-right) + 9px));width:min(270px,78vw);padding:10px;background:#08111d;border-color:#d2a744;display:grid;gap:7px}
+.settings-title{text-align:center;color:#ffe18a;font-size:11px;letter-spacing:.14em;padding-bottom:6px;border-bottom:2px solid #59451f}
+.settings-popover button{min-height:38px;border:2px solid #526174;background:#0d1826;color:#dce7ef;display:flex;justify-content:space-between;align-items:center;padding:6px 9px;font-weight:900;font-size:9px;letter-spacing:.1em}
+.settings-popover button b{color:#76d8ff}.settings-popover button:disabled{opacity:.45}.settings-popover .settings-close{justify-content:center;border-color:#8e743b;color:#ffe18a}
+
+/* Exact sprite-cell powerup cropping. */
+.power-sprite{display:block;width:32px!important;height:32px!important;min-width:32px;border:0!important;padding:0!important;background-image:url('/assets/powerups.png')!important;background-repeat:no-repeat!important;background-size:96px 32px!important;image-rendering:pixelated;filter:drop-shadow(0 0 6px rgba(255,224,110,.28))}
+.power-sprite.power-invisibility{background-position:0 0!important}.power-sprite.power-override{background-position:-32px 0!important;filter:drop-shadow(0 0 7px rgba(80,190,255,.45))}.power-sprite.power-phase{background-position:-64px 0!important;filter:drop-shadow(0 0 7px rgba(255,222,75,.38))}
+.power-card .power-sprite{transform:scale(1.65);margin:8px}.tutorial-power-grid-v2 .power-sprite{transform:scale(1.45);margin:7px;background-color:transparent!important}
+
+/* Sprite-atlas decimal timers; no browser font is used for the digits. */
+.pixel-timer{--digit-cell:27px;--digit-height:39px;display:flex;justify-content:center;align-items:center;gap:1px;filter:drop-shadow(3px 3px 0 #5b3514) drop-shadow(0 0 5px rgba(255,215,85,.25))}
+.pixel-timer i{display:block;width:var(--digit-cell);height:var(--digit-height);background-image:url('/assets/ui/pixel-digits.png');background-repeat:no-repeat;background-size:297px 39px;background-position:var(--digit-x) 0;image-rendering:pixelated}
+.phase-timer-frame,.choice-timer-frame{z-index:38;background:linear-gradient(#151b22,#080d14);border:3px solid #e0ad43;box-shadow:0 0 0 2px #5a3b17,4px 4px 0 #020409,0 0 12px rgba(255,200,65,.14);clip-path:polygon(7px 0,calc(100% - 7px) 0,100% 7px,100% calc(100% - 7px),calc(100% - 7px) 100%,7px 100%,0 calc(100% - 7px),0 7px);padding:5px 9px}
+.phase-timer-frame{position:absolute;left:50%;top:9px;transform:translateX(-50%);pointer-events:none}
+.choice-timer-frame{display:inline-block;margin:-8px auto 6px;padding:4px 7px}.choice-timer-frame .pixel-timer{transform:scale(.82);transform-origin:center;margin:-3px -8px}
+.round-overlay .pixel-timer,.waiting-overlay .pixel-timer{margin-bottom:9px}
+
+/* Shuffle and pre-round punctuation. */
+.shuffle-label{position:absolute;z-index:28;left:50%;top:9px;transform:translateX(-50%);padding:6px 10px;border:2px solid #886c34;background:#07101a;color:#e9cc75;font-size:8px;font-weight:1000;letter-spacing:.12em;pointer-events:none}
+.pre-round-overlay{position:absolute;inset:0;z-index:34;display:grid;place-items:center;align-content:center;gap:10px;pointer-events:none;background:radial-gradient(circle,rgba(8,16,27,.18),transparent 54%)}
+.ready-banner,.go-banner,.final-two-banner,.override-banner{display:block;image-rendering:pixelated;object-fit:contain;filter:drop-shadow(4px 4px 0 #02040a)}
+.ready-banner{width:min(180px,36%)}.go-banner{width:min(110px,25%);animation:go-pop .36s steps(2,end) infinite}.final-two-banner{width:min(330px,62%);animation:final-two-flash .55s steps(2,end) infinite}
+@keyframes go-pop{50%{transform:scale(1.07)}}@keyframes final-two-flash{50%{opacity:.58;transform:scale(1.02)}}
+
+/* Final-two atmosphere intensifies existing effects without changing gameplay. */
+html[data-final-two="yes"] .particle-field i{filter:brightness(1.25);animation-duration:6s;height:3px}
+.final-two-arena{box-shadow:0 0 0 2px #5a3b17,0 0 0 4px rgba(255,219,117,.14),0 0 30px rgba(255,193,65,.25),inset 0 0 18px rgba(255,211,82,.06)!important}
+
+/* Selector suspense and private Override identity. */
+.selector-wheel{animation-duration:4.55s!important;animation-timing-function:cubic-bezier(.08,.7,.08,1)!important}
+.override-local .selector-wheel{box-shadow:0 0 0 4px #5fc6ff,0 0 28px rgba(59,180,255,.7),6px 7px 0 #040609!important;animation-name:wheel-spin,override-electric!important;animation-duration:4.55s,.28s!important;animation-timing-function:cubic-bezier(.08,.7,.08,1),steps(2,end)!important;animation-iteration-count:1,infinite!important}
+.override-banner{position:absolute;z-index:6;top:12%;width:min(260px,46%);animation:override-flash .5s steps(2,end) 2}
+@keyframes override-flash{50%{opacity:.38;transform:scale(1.04)}}@keyframes override-electric{50%{filter:brightness(1.28) drop-shadow(0 0 8px #5fc6ff)}}
+
+/* Previous winner crown is attached to gamer tag, not the sprite. */
+.name-crown{display:inline-block!important;width:15px!important;height:15px!important;margin-left:4px!important;transform:none!important;vertical-align:-4px;image-rendering:pixelated;animation:crown-twinkle 1.4s steps(2,end) infinite}
+@keyframes crown-twinkle{50%{filter:brightness(1.35) drop-shadow(0 0 3px #ffd84f)}}
+
+/* Podium result scene. */
+.podium-overlay{position:absolute;inset:0;z-index:60;background:#03060b;display:grid;place-items:center;animation:podium-fade 3.6s ease both;pointer-events:none}
+@keyframes podium-fade{0%{opacity:0}8%{opacity:1}90%{opacity:1}100%{opacity:0}}
+.podium-scene{position:relative;width:min(620px,92%);height:min(430px,88%);display:flex;align-items:flex-end;justify-content:center;gap:8px;padding:22px 12px 24px;background:radial-gradient(circle at 50% 28%,rgba(255,210,83,.13),transparent 34%)}
+.podium-entry{position:relative;width:29%;display:grid;justify-items:center;align-content:end}.podium-slot-1{order:2}.podium-slot-0{order:1}.podium-slot-2{order:3}
+.podium-name{position:relative;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#f4f7fa;font-weight:900;font-size:clamp(9px,1.7vw,14px);text-shadow:2px 2px 0 #02040a;margin-bottom:3px}.podium-crown{position:absolute;width:20px;height:20px;right:-21px;top:-7px;image-rendering:pixelated;animation:crown-arrive .48s steps(4,end) .65s both}
+@keyframes crown-arrive{0%{opacity:0;transform:translateY(-13px) scale(.3)}100%{opacity:1;transform:none}}
+.podium-character{width:72px;height:72px;background-repeat:no-repeat;background-size:400% 800%;background-position-y:0%;image-rendering:pixelated;filter:drop-shadow(3px 5px 0 #02040a)}
+.podium-winner .podium-character{background-position-y:0;animation:podium-dance .68s steps(4,end) infinite}
+@keyframes podium-dance{0%{background-position-x:0;transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-7px) rotate(2deg)}100%{background-position-x:100%;transform:translateY(0) rotate(-2deg)}}
+.podium-block{position:relative;width:100%;display:grid;place-items:center;background:linear-gradient(#d9ac45,#8a561e);border:4px solid #ffe081;box-shadow:inset 0 0 0 3px #704116,6px 6px 0 #020409;color:#fff1b2;text-shadow:2px 2px 0 #5c3513}.podium-block>b{font-size:clamp(22px,4vw,42px)}
+.podium-slot-1 .podium-block{height:150px}.podium-slot-0 .podium-block{height:105px}.podium-slot-2 .podium-block{height:78px}
+.podium-trophies{position:absolute;bottom:8px;display:flex;align-items:center;gap:4px;font-weight:1000;font-size:12px}.podium-trophies img{width:20px;height:20px;image-rendering:pixelated}
+.rematch-button{border:4px solid #e0ad43;background:linear-gradient(#172536,#09111c);box-shadow:0 0 0 2px #533715,6px 6px 0 #020409;padding:9px 14px;min-width:190px}.rematch-button img{display:block;width:min(220px,50vw);max-height:48px;object-fit:contain;image-rendering:pixelated}.rematch-button.ready{border-color:#63da7a;filter:drop-shadow(0 0 7px rgba(84,220,116,.35))}
+.winner-overlay>span{font-size:12px;color:#ffe27b;margin-bottom:12px}
+
+/* Tutorial page two uses the same pointing-character language as page one. */
+.tutorial-mascot.sit{display:none!important}.tutorial-mascot.final-point{left:calc(100% + 8px)!important;bottom:-1px!important;transform:none!important}
+
+/* Slightly more dramatic eliminated cards. */
+.player-card.dead{animation:dead-card-flicker .45s steps(3,end) 1;opacity:.34;filter:grayscale(.82)}
+@keyframes dead-card-flicker{0%,35%,70%{opacity:.85}20%,55%{opacity:.18}100%{opacity:.34}}
+
+/* Mobile scaling for the new sensory UI. */
+html[data-tiles-layout="mobile-landscape"] .pixel-timer,html[data-tiles-layout="mobile-portrait"] .pixel-timer{transform:scale(.72);transform-origin:center}
+html[data-tiles-layout="mobile-landscape"] .phase-timer-frame{top:4px;padding:1px 3px;border-width:2px}
+html[data-tiles-layout="mobile-portrait"] .phase-timer-frame{top:5px;padding:2px 4px;border-width:2px}
+html[data-tiles-layout="mobile-landscape"] .settings-button,html[data-tiles-layout="mobile-portrait"] .settings-button{width:36px;height:36px;border-width:2px}
+html[data-tiles-layout="mobile-landscape"] .power-card .power-sprite,html[data-tiles-layout="mobile-portrait"] .power-card .power-sprite{transform:scale(.82);margin:0}
+html[data-tiles-layout="mobile-landscape"] .podium-scene{height:92%;padding-top:5px}.podium-character{max-width:18vw;max-height:18vw}
+html[data-tiles-layout="mobile-portrait"] .podium-scene{height:76%;width:96%;gap:4px}.podium-slot-1 .podium-block{height:120px}.podium-slot-0 .podium-block{height:88px}.podium-slot-2 .podium-block{height:66px}
+
+@media(prefers-reduced-motion:reduce){.podium-winner .podium-character,.final-two-banner,.go-banner,.override-banner,.name-crown{animation:none!important}}
+
+/* v0.7 finishing polish: full-screen podium and sprite-based numeric score readouts. */
+.player-card.selector-picked{animation:selector-card-pulse .52s steps(3,end) 1;box-shadow:0 0 0 2px var(--player-color),0 0 22px color-mix(in srgb,var(--player-color) 48%,transparent),inset 0 0 12px color-mix(in srgb,var(--player-color) 12%,transparent)}
+@keyframes selector-card-pulse{0%,100%{transform:scale(1)}45%{transform:scale(1.035);filter:brightness(1.24)}}
+.player-trophies{display:flex!important;align-items:center;justify-content:flex-end;gap:2px}.player-trophies>img{width:15px!important;height:15px!important;transform:none!important;image-rendering:pixelated}.pixel-count{--digit-cell:27px;--digit-height:39px;transform:scale(.34);transform-origin:left center;margin-right:-16px;margin-left:-8px}
+.podium-overlay{position:fixed!important;inset:0!important;z-index:140!important;padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));background:#03060b!important}
+.podium-place{transform:scale(.78);transform-origin:center}.podium-trophies .pixel-count{transform:scale(.42);margin-left:-7px;margin-right:-12px}.podium-block>b{display:none}
+.go-flash-overlay{position:absolute;inset:0;z-index:37;display:grid;place-items:center;align-content:center;gap:8px;pointer-events:none;background:radial-gradient(circle,rgba(8,16,27,.14),transparent 48%)}
+.podium-scene{animation:podium-scene-visibility 3.6s ease both}
+@keyframes podium-scene-visibility{0%,8%{opacity:0;transform:scale(.985)}14%,84%{opacity:1;transform:scale(1)}92%,100%{opacity:0;transform:scale(.99)}}
+html[data-tiles-layout="mobile-landscape"] .winner-overlay .rematch-button,html[data-tiles-layout="mobile-portrait"] .winner-overlay .rematch-button{display:none}

@@ -1,22 +1,18 @@
 export const MAX_PLAYERS = 5;
 export const MIN_PLAYERS = 2;
 export const BOARD_RADIUS = 2;
+
 export const MOVEMENT_PHASE_MS = 7000;
 export const START_COUNTDOWN_MS = 8000;
-export const SELECTOR_WHEEL_MS = 4000;
-export const SELECTOR_CHOICE_MS = 4000;
-export const REVEAL_WINDOW_MS = 1150;
-export const RESULTS_MS = 1850;
+export const ROUND_SHUFFLE_MS = 1200;
+export const PRE_ROUND_COUNTDOWN_MS = 3000;
+export const SELECTOR_WHEEL_MS = 5000;
+export const SELECTOR_CHOICE_MS = 5000;
+export const REVEAL_WINDOW_MS = 1650;
+export const RESULTS_MS = 1650;
+export const PODIUM_MS = 3600;
+
 export const BASE_STEP_MS = 150;
-export const SPEED_STEP_MS = 95;
-export const SPEED_DURATION_MS = 3500;
-export const BUBBLE_DURATION_MS = 4000;
-export const GLANCING_COLLISION_MS = 300;
-export const HEAD_ON_COLLISION_MS = 1050;
-export const BUBBLE_COLLISION_MS = 340;
-export const COLLISION_COMMIT_MS = 300;
-export const COLLISION_PAIR_COOLDOWN_MS = 1000;
-export const COLLISION_FAILSAFE_MS = 1500;
 export const RECONNECT_GRACE_MS = 45000;
 export const PUBLIC_FIRST_BOT_DELAY_MS = 4600;
 export const PUBLIC_NEXT_BOT_MIN_MS = 3600;
@@ -25,4 +21,3 @@ export const BOT_READY_MIN_MS = 800;
 export const BOT_READY_MAX_MS = 3000;
 export const BOT_SELECTOR_MIN_MS = 750;
 export const BOT_SELECTOR_MAX_MS = 2500;
-

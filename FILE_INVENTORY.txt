@@ -1,3 +1,6 @@
+Tiles V0.7 file inventory
+=========================
+
 .github/workflows/ci.yml
 .gitignore
 .nvmrc
@@ -5,6 +8,7 @@ CHANGELOG_v0.4.txt
 CHANGELOG_v0.5.3.txt
 CHANGELOG_v0.5.txt
 CHANGELOG_v0.6.txt
+CHANGELOG_v0.7.txt
 FILE_INVENTORY.txt
 GAME_SPEC.md
 README.md
@@ -14,14 +18,14 @@ art-reference/a_clean_high_resolution_game_asset_sprite_sheet_o.png
 art-reference/a_clean_pixel_art_game_design_presentation_image_o.png
 art-reference/apogee-lab-logo-source.png
 art-reference/final-tiles-logo-source.png
-art-reference/mobile-layout-3390.jpeg
-art-reference/mobile-layout-3391.jpeg
-art-reference/mobile-layout-3392.jpeg
-art-reference/mobile-layout-3393.jpeg
 art-reference/mobile/IMG_3385.jpeg
 art-reference/mobile/IMG_3386.jpeg
 art-reference/mobile/IMG_3387.png
 art-reference/mobile/IMG_3388.jpeg
+art-reference/mobile-layout-3390.jpeg
+art-reference/mobile-layout-3391.jpeg
+art-reference/mobile-layout-3392.jpeg
+art-reference/mobile-layout-3393.jpeg
 art-reference/native-browser-3394.jpeg
 art-reference/native-browser-3395.jpeg
 art-reference/neon_color_drop_arena.png
@@ -48,8 +52,17 @@ public/assets/characters/thumbs/red.png
 public/assets/characters/thumbs/yellow.png
 public/assets/characters/yellow.png
 public/assets/powerups.png
-public/assets/tiles-logo.png
 public/assets/tiles/hex-atlas.png
+public/assets/tiles-logo.png
+public/assets/ui/crown.png
+public/assets/ui/final-two.png
+public/assets/ui/gear.png
+public/assets/ui/go.png
+public/assets/ui/override.png
+public/assets/ui/pixel-digits.png
+public/assets/ui/ready.png
+public/assets/ui/rematch.png
+public/assets/ui/trophy.png
 public/audio/retro-arcade-theme.mp3
 public/icons/apple-touch-icon.png
 public/icons/favicon.ico

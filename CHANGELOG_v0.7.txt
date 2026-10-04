@@ -1,0 +1,31 @@
+Tiles V0.7 — Sensory Arcade Update
+
+GAMEPLAY
+- Replaced Speed with Invisibility.
+- Replaced Bubble with globally unique Override.
+- Phase Shift reaction window increased to 1.65 s.
+- Added Spacebar powerup activation.
+- Added hidden bots-only endgame pacing governor with 1–3 grace rounds and no consecutive 3s.
+
+PACING
+- Added 7.0 s visible movement timer with tenths.
+- Added 5.0 s visible color-choice timer with tenths.
+- Added 1.2 s board shuffle + 3.0 s pre-round countdown before movement.
+- Added synchronized countdown/GO sound cues and optional haptics.
+
+PRESENTATION
+- Added custom pixel timer digit atlas.
+- Added left-to-right tile flip wave, settle bounce and soft mechanical click sequence.
+- Extended selector wheel phase and final deceleration; added boundary ticks, landing clunk and selected-card pulse.
+- Added Invisibility glitch effect, local translucent self, Override local electric wheel treatment, and Phase Shift lightning transfer.
+- Added longer panic/fall elimination presentation.
+- Added FINAL TWO banner, stronger particles and arena glow.
+- Added full-screen podium, trophy counts, winner dance, previous-winner crown and REMATCH? flow.
+- Added home-screen Settings panel; removed persistent sound toggle.
+- Updated tutorial to Invisibility / Override / Phase Shift and corrected sprite cropping.
+- Moved Tiles-logo confetti origins tight to the logo corners.
+
+ROBUSTNESS
+- Cleans stale pending Override owner before selector resolution.
+- Prevents podium departures from triggering a second match winner calculation.
+- Preserves V0.6 occupancy movement and V0.5.3 authoritative wheel geometry.
