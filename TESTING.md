@@ -1,4 +1,4 @@
-# Tiles V0.8 — Regression / Acceptance Testing
+# Tiles V0.9 — Regression / Acceptance Testing
 
 ## Build / source checks
 
@@ -6,149 +6,162 @@
 - [ ] `npm run typecheck` passes.
 - [ ] `npm run build` passes.
 - [ ] Cloudflare deployment binds both `GAME_ROOMS` and `MATCHMAKER`.
-- [ ] No temporary validation stubs are included in the release ZIP.
+- [ ] No temporary validation stubs or `node_modules` are included in release ZIP.
+- [ ] No client code uses `new Audio(...)` for soundtrack management.
+- [ ] No Media Session metadata/background-media registration exists.
 
-## Pixel-art UI audit
+## Mobile viewport/layout
 
-- [ ] Homepage has no visible smooth/system font.
-- [ ] Tutorial has no visible smooth/system font.
-- [ ] Dynamic gamer tags render with Tiles Pixel.
-- [ ] Room code, player states, selector copy, timers and podium values render with Tiles Pixel.
-- [ ] Inputs retain native interaction but visually match pixel UI.
-- [ ] Selector wheel/pointer have stepped/hard pixel silhouettes.
-- [ ] Buttons/panels/settings/toasts do not look like modern rounded browser UI.
-- [ ] No important icon or sprite becomes blurry when scaled.
+### iPhone Safari portrait
+- [ ] No essential vertical scroll.
+- [ ] Header fully visible.
+- [ ] Horizontal player strip fits.
+- [ ] Arena fully visible.
+- [ ] Power-up panel remains shallow.
+- [ ] READY / LEAVE fully visible above Safari/home-indicator area.
+- [ ] Opening/closing Safari chrome does not clip controls.
 
-## Player cards / podium
+### iPhone PWA portrait
+- [ ] Safe areas respected.
+- [ ] No excessive top/bottom margins.
+- [ ] All essential gameplay UI visible simultaneously.
 
-- [ ] Trophy icon and win count do not overlap at desktop size.
-- [ ] Trophy/count remain aligned in mobile landscape.
-- [ ] Portrait compact player strip does not overflow.
-- [ ] Podium winner shows exactly one sprite frame at a time.
-- [ ] Winner dance does not expose adjacent sprite cells.
-- [ ] Zero-trophy podium positions display no trophy icon.
-- [ ] Crown is beside latest winner's gamer tag, not attached to character sprite.
-- [ ] Crown transfers correctly after the next winner.
+### iPhone Safari landscape
+- [ ] Layout order is `Power-Up | Arena | Players`.
+- [ ] Protected bottom action row remains visible.
+- [ ] Compact mode engages at constrained visualViewport height.
+- [ ] Arena shrinks before essential buttons disappear.
+- [ ] Dynamic Island/notch safe side remains usable.
 
-## Movement
+### iPhone PWA landscape
+- [ ] Three-column layout fits without scrolling.
+- [ ] No home-indicator clipping.
+- [ ] Side panels remain readable but do not steal arena/control space.
 
-Use at least two real clients plus bots.
+### Rotation / browser chrome
+- [ ] Portrait → landscape mid-lobby recomputes correctly.
+- [ ] Landscape → portrait mid-match keeps canvas overlays aligned.
+- [ ] `visualViewport` resize/scroll from Safari chrome updates layout without a refresh.
 
-- [ ] Moving characters can cross/slide through one another without recoil or loop.
-- [ ] Intermediate occupied route cells do not cancel movement.
-- [ ] Human may target a currently occupied final tile.
-- [ ] If occupant leaves before arrival, human enters normally.
-- [ ] If final target remains occupied, human stops one tile short.
-- [ ] Blocked target flashes red locally only.
-- [ ] Blocked error sound plays locally only.
-- [ ] No bump/recoil animation occurs.
-- [ ] Two clients racing for same final empty tile resolve deterministically with no overlap.
-- [ ] Bots use the same final-destination occupancy rule.
-- [ ] A blocked bot resumes normal waypoint behavior later without being stuck.
+### Landing/settings
+- [ ] Browser portrait landing card/footer fits.
+- [ ] Browser landscape landing card does not overflow.
+- [ ] Decorative floating characters yield space in compact mode.
+- [ ] Settings panel stays inside usable viewport.
 
-## Audio
+## Audio foreground lifecycle
 
-### Board flip
-- [ ] Mechanical click fires with each visual tile flip.
-- [ ] Left-to-right wave sound follows visual wave.
-- [ ] 19 overlapping clicks remain quiet/clean rather than muddy.
+On real iOS Safari and installed PWA:
 
-### Tile break
-- [ ] Ceramic cue plays once per doomed-color destruction event.
-- [ ] Cue aligns with crack/drop, not board shuffle.
+- [ ] Music begins after a legitimate user interaction.
+- [ ] Lock phone while music plays → Tiles audio stops immediately.
+- [ ] Return to iOS Home Screen → Tiles audio stops immediately.
+- [ ] Switch to another app → Tiles audio stops.
+- [ ] Switch Safari tab → Tiles audio stops.
+- [ ] Backgrounded Tiles does not intentionally present persistent lock-screen/Dynamic-Island media controls.
+- [ ] Return to Tiles → only the currently appropriate soundtrack resumes.
+- [ ] Missed selector ticks do not replay.
+- [ ] Missed board-flip clicks do not replay.
+- [ ] Missed break/fanfare cues do not replay.
+- [ ] Repeated background/foreground cycles do not permanently silence music.
+- [ ] If existing AudioContext is interrupted, recovery/watchdog restores soundtrack after a valid resume/unlock condition.
 
-### Final Two
-- [ ] Swoosh fires exactly once on first transition to two survivors.
-- [ ] Banner enter/hold/exit motion fits the swoosh.
-- [ ] Swoosh does not replay when both Final Two players survive another round.
+## Audio mix / sliders
 
-### Podium
-- [ ] Podium appears, then fanfare begins after the intended pause.
-- [ ] Fanfare does not fire twice.
+- [ ] Music is noticeably ~35% lower than V0.8 baseline at displayed 100.
+- [ ] Selector wheel ticks are clearly audible over music.
+- [ ] Wheel landing clunk remains distinct.
+- [ ] MUSIC VOLUME slider shows 100 by default.
+- [ ] SOUND EFFECTS slider shows 100 by default.
+- [ ] Both move in 5% steps from 0–100.
+- [ ] Music slider affects normal and Final Two tracks live.
+- [ ] SFX slider affects event sounds + synthesized tones.
+- [ ] SFX slider release/key release gives a small preview cue.
+- [ ] Volume preferences survive reload.
+- [ ] Setting volume to 0 behaves as muted and remains persisted.
 
-### Settings
-- [ ] SOUND FX OFF disables all event SFX.
-- [ ] MUSIC OFF disables normal and Final Two music.
-- [ ] Haptics only activate when browser supports vibration and setting is ON.
+## Final Two music reliability
 
-## Final Two atmosphere
+- [ ] Normal track crossfades to Final Two without silence.
+- [ ] Repeated Final Two state packets do not restart/retrigger transition.
+- [ ] If Final Two source cannot be prepared, currently working music is not intentionally stopped first.
+- [ ] Equivalent normalized song position is preserved.
+- [ ] New match returns to normal soundtrack mode.
 
-- [ ] Transition to exactly two survivors activates persistent Final Two mode.
-- [ ] Shooting particles are clearly more active/brighter than normal.
-- [ ] Hollow-center pixel stars remain visible and intensify.
-- [ ] Arena frame glow is visibly stronger.
-- [ ] Normal soundtrack crossfades to faster pitch-preserved version.
-- [ ] Faster track sounds faster without a chipmunk/pitch-up effect.
-- [ ] Track does not obviously restart at zero when Final Two begins.
-- [ ] New match returns to normal-speed music.
+## Inactivity cleanup
 
-## Post-match / lobby
+Use two humans plus bots where possible.
 
-- [ ] Final match transitions to podium.
-- [ ] Podium remains synchronized for all clients.
-- [ ] After podium, room returns directly to ordinary lobby.
-- [ ] No REMATCH / Ready for Rematch UI appears.
-- [ ] All human READY states are reset.
-- [ ] Trophy totals remain.
-- [ ] Latest-winner crown remains.
-- [ ] Pressing READY starts the normal lobby flow again.
+- [ ] Human makes one movement input → not removed after match.
+- [ ] Human manually chooses one color → not removed.
+- [ ] Human legally activates one held powerup → not removed.
+- [ ] Human targets an occupied destination and is blocked → still counts as activity.
+- [ ] Human does absolutely no gameplay input for whole match → remains through match/podium, then removed.
+- [ ] Removed client returns home with `REMOVED FOR INACTIVITY`.
+- [ ] Removed player's room reconnect identity cannot immediately restore them.
+- [ ] READY alone does not count as match activity.
+- [ ] Volume/settings changes do not count.
+- [ ] Dead player who acted before elimination is not removed for inactivity.
+- [ ] Bots are never removed by inactivity policy.
+- [ ] If inactivity removes final human from public room, room is abandoned/not reusable by Quick Play.
 
-## Quick Play abandoned-room behavior
+## Bot human-present governor
 
-### Explicit leave
-1. Start Quick Play with one human + bots.
-2. Human intentionally presses Leave Room.
-3. Verify the public room is no longer reusable.
-4. Press Quick Play again from a fresh client.
-5. Verify a fresh room is created rather than reopening the old bot state.
+Create match with at least one living human and multiple bots.
 
-### Reconnect grace
-1. Start a public room.
-2. Close/reload the browser without Leave Room.
-3. Reconnect within grace.
-4. Verify same identity/state can reconnect.
-5. Verify unrelated Quick Play users do not get matched into a zero-connected-human stale room during that grace period.
+- [ ] Governor can force progress after its grace window while a human is alive.
+- [ ] Bot never intentionally chooses its own current tile color.
+- [ ] Bot-only candidate colors are preferred over human-containing candidates.
+- [ ] Human-containing colors are still sometimes chosen; human is not immune.
+- [ ] Mixed human+bot color receives the human-protection roll.
+- [ ] No selection decision hangs from an infinite reroll.
+- [ ] Visible selector delay remains 0.75–2.5 s; hidden rerolls are not perceptible.
+- [ ] Natural elimination grants another human-phase grace window.
 
-### Quiet-period judging case
-- [ ] With no public room containing a connected human, the first Quick Play request always gets a fresh room.
-- [ ] A second human can then join that live human room normally.
+### Bot-only compatibility
+- [ ] Once `humanAliveCount === 0`, original bots-only governor behavior is unchanged.
+- [ ] Grace is 1–3 rounds.
+- [ ] 3 is never rolled twice consecutively within bot-only governor history.
+- [ ] Natural bot death resets/rerolls.
+- [ ] Forced choice prefers exactly-one bot target, then fewest bots.
+- [ ] No hidden bot movement manipulation occurs.
 
-## Bot identity pool
+## Movement regression
 
-- [ ] Pool contains exactly 250 preset names.
-- [ ] 85 are human-style names/variants.
-- [ ] 165 are arcade/gamer names.
-- [ ] No duplicate visible names in a room.
-- [ ] Bot name never duplicates a human's current visible name.
-- [ ] No BOT label appears.
+- [ ] Moving players can cross/slide without bump/recoil loops.
+- [ ] Intermediate occupied cells do not cancel movement.
+- [ ] Occupied final target may be selected.
+- [ ] If target frees before arrival, mover enters it.
+- [ ] If target remains occupied, mover stops one tile short.
+- [ ] Human receives local red flash + blocked SFX only.
+- [ ] Bots obey same final destination rule without local feedback.
+- [ ] Simultaneous final claims never produce persistent overlap.
 
-## Existing V0.7 regressions
+## Post-match / room lifecycle
 
-- [ ] Invisibility hides board position from other players only.
-- [ ] Override remains globally unique and guarantees next selector.
-- [ ] Phase Shift works during 1.65 s reveal window.
-- [ ] Spacebar activates a legal powerup unless focus is in editable input.
-- [ ] 7.0 s movement timer is server-authoritative.
-- [ ] 5.0 s choice timer is server-authoritative.
-- [ ] Selector visual landing matches server-selected player.
-- [ ] Bots-only endgame governor cannot intentionally choose selector's own color.
-- [ ] Dead players never reappear in later tile-drop animations.
+- [ ] Final elimination → podium.
+- [ ] Podium → inactivity cleanup → normal lobby.
+- [ ] No REMATCH UI appears.
+- [ ] READY resets.
+- [ ] trophies and latest-winner crown persist unless winner was removed for inactivity.
+- [ ] Explicit final-human leave abandons public room immediately.
+- [ ] Unexpected disconnect still gets reconnect grace.
+- [ ] Fresh Quick Play after zero-human abandonment never lands in stale prior bot state.
 
-## Responsive / device tests
+## Favicon/PWA icon
 
-### Desktop
-- [ ] Full layout fits and floating art/particles do not block controls.
+- [ ] Browser tab uses current approved Tiles icon.
+- [ ] 16/32/64/ICO favicon assets are current.
+- [ ] Apple touch icon is current.
+- [ ] Add to Home Screen uses current icon.
+- [ ] Manifest 192 and 512 icons use V0.9 cache-busted paths.
+- [ ] No HTML/manifest reference points to old artwork.
 
-### Mobile portrait
-- [ ] No essential gameplay scrolling.
-- [ ] Dynamic Island/notch safe area is respected.
-- [ ] READY + LEAVE remain reachable in lobby.
+## Pixel/UI regression
 
-### Mobile landscape browser
-- [ ] VisualViewport fitting accounts for Safari/browser chrome.
-- [ ] Power-Up | Arena | Players order is correct.
-- [ ] No control is clipped by device cutouts.
-
-### Installed Home Screen / PWA
-- [ ] Uses additional available screen space without misalignment.
-- [ ] Icon/manifest launch correctly.
+- [ ] Visible game text remains Tiles Pixel.
+- [ ] Pixel sliders do not expose native range styling.
+- [ ] Settings controls remain finger-sized.
+- [ ] Podium animation still snaps exact sprite frames.
+- [ ] Trophy icon/count remain non-overlapping.
+- [ ] Final Two one-shot banner and atmosphere still work.

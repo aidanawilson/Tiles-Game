@@ -369,3 +369,165 @@ html[data-tiles-layout="mobile-landscape"] .particle-field .pixel-star:nth-of-ty
   background:#fff2b5;
   box-shadow:5px 0 0 #fff2b5,10px 0 0 #fff2b5,15px 0 0 #fff2b5,20px 0 0 #fff2b5,5px 5px 0 #fff2b5,10px 5px 0 #fff2b5,15px 5px 0 #fff2b5,10px 10px 0 #fff2b5;
 }
+
+/* ==========================================================================
+   v0.9 mobile reliability + audio controls
+   The v0.9 runtime chooses an explicit browser/PWA + portrait/landscape mode.
+   These rules intentionally override the older fluid mobile experiments.
+   ========================================================================== */
+:root{
+  --usable-width:100vw;--usable-height:100dvh;
+  --safe-top:env(safe-area-inset-top,0px);--safe-right:env(safe-area-inset-right,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);--safe-left:env(safe-area-inset-left,0px);
+}
+.landing-notice{margin:8px 0 0;padding:8px 10px;border:3px solid #eab74b;background:#241b0c;color:#ffe28a;box-shadow:3px 3px 0 #020409;font-size:8px;letter-spacing:.09em;text-align:center}
+
+/* Pixel volume controls: the native range is only the input hit target. */
+.volume-control{position:relative;display:grid;gap:7px;padding:8px;border:2px solid #4f5d70;background:#07101a;overflow:hidden}
+.volume-control>span{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:8px;letter-spacing:.08em;color:#dbe7ef}
+.volume-control>span strong{color:#75d7ff;min-width:28px;text-align:right}
+.volume-control>i{position:absolute;left:9px;right:9px;bottom:10px;height:8px;pointer-events:none;background:linear-gradient(90deg,#f0bd4e 0 var(--volume-fill),#172333 var(--volume-fill) 100%);box-shadow:0 0 0 2px #070b10,0 0 0 3px #6c5528;image-rendering:pixelated}
+.pixel-slider{position:relative;z-index:2;width:100%;height:18px;margin:0;opacity:0;cursor:pointer}
+.settings-popover .volume-control b{color:#dbe7ef!important}
+
+/* Mobile is a fixed foreground game surface. visualViewport supplies the real usable height. */
+html[data-tiles-layout="mobile-portrait"] body,
+html[data-tiles-layout="mobile-landscape"] body{overflow:hidden!important;width:100%;height:var(--usable-height)!important;overscroll-behavior:none}
+html[data-tiles-layout="mobile-portrait"] #root,
+html[data-tiles-layout="mobile-landscape"] #root{height:var(--usable-height)!important;min-height:0!important;overflow:hidden!important}
+html[data-tiles-layout="mobile-portrait"] .game-screen,
+html[data-tiles-layout="mobile-landscape"] .game-screen{
+  width:var(--usable-width)!important;height:var(--usable-height)!important;min-height:0!important;max-width:none!important;
+  display:flex!important;flex-direction:column!important;overflow:hidden!important;margin:0!important;
+  padding-top:max(4px,var(--safe-top))!important;padding-right:max(6px,var(--safe-right))!important;
+  padding-bottom:max(5px,var(--safe-bottom))!important;padding-left:max(6px,var(--safe-left))!important;
+}
+html[data-tiles-layout="mobile-portrait"] .arcade-header,
+html[data-tiles-layout="mobile-landscape"] .arcade-header{flex:0 0 auto!important}
+html[data-tiles-layout="mobile-portrait"] .connection-strip,
+html[data-tiles-layout="mobile-landscape"] .connection-strip{flex:0 0 auto!important}
+html[data-tiles-layout="mobile-portrait"] .game-grid,
+html[data-tiles-layout="mobile-landscape"] .game-grid{flex:1 1 auto!important;min-height:0!important;overflow:hidden!important}
+html[data-tiles-layout="mobile-portrait"] .mobile-actionbar,
+html[data-tiles-layout="mobile-landscape"] .mobile-actionbar{flex:0 0 auto!important;min-height:0!important}
+
+/* PORTRAIT: horizontal roster -> arena -> shallow power shelf. */
+html[data-tiles-layout="mobile-portrait"] .arcade-header{
+  height:50px!important;min-height:50px!important;grid-template-columns:82px minmax(0,1fr) 54px!important;gap:4px!important;padding:3px 5px!important;
+}
+html[data-tiles-layout="mobile-portrait"] .arcade-header .tiles-logo img{max-height:38px!important;width:min(190px,94%)!important}
+html[data-tiles-layout="mobile-portrait"] .arcade-header strong{font-size:12px!important}html[data-tiles-layout="mobile-portrait"] .arcade-header small{font-size:5.5px!important}
+html[data-tiles-layout="mobile-portrait"] .room-copy{width:78px!important;min-width:0!important;padding:3px 5px!important;border-width:2px!important}
+html[data-tiles-layout="mobile-portrait"] .connection-strip{margin-top:3px!important;padding:2px!important;font-size:6px!important}
+html[data-tiles-layout="mobile-portrait"] .game-grid{
+  margin-top:4px!important;display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:60px minmax(0,1fr) 58px!important;gap:4px!important;height:auto!important;
+}
+html[data-tiles-layout="mobile-portrait"] .players-panel{order:1!important;padding:4px!important;overflow:hidden!important;min-height:0!important}
+html[data-tiles-layout="mobile-portrait"] .players-panel .panel-heading{display:none!important}
+html[data-tiles-layout="mobile-portrait"] .player-list{height:100%!important;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:3px!important;margin:0!important;align-items:stretch!important}
+html[data-tiles-layout="mobile-portrait"] .player-card{height:100%!important;grid-template-columns:1fr!important;grid-template-rows:31px minmax(0,1fr)!important;place-items:center!important;gap:0!important;padding:2px 1px!important;text-align:center!important;overflow:hidden!important}
+html[data-tiles-layout="mobile-portrait"] .player-card>img{width:30px!important;height:30px!important;transform:scale(1.04)!important}
+html[data-tiles-layout="mobile-portrait"] .player-card-copy{width:100%!important;min-width:0!important}
+html[data-tiles-layout="mobile-portrait"] .player-card b{font-size:5.5px!important;line-height:1.15!important;max-width:100%!important}
+html[data-tiles-layout="mobile-portrait"] .player-card small{font-size:4.2px!important;margin-top:1px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+html[data-tiles-layout="mobile-portrait"] .name-crown{width:9px!important;height:9px!important;margin-left:1px!important;vertical-align:-2px!important}
+html[data-tiles-layout="mobile-portrait"] .name-dot,html[data-tiles-layout="mobile-portrait"] .player-trophies{display:none!important}
+html[data-tiles-layout="mobile-portrait"] .arena-frame{order:2!important;height:100%!important;min-height:0!important;overflow:hidden!important}
+html[data-tiles-layout="mobile-portrait"] .game-canvas{height:100%!important;min-height:0!important;width:100%!important}
+html[data-tiles-layout="mobile-portrait"] .power-panel{order:3!important;height:58px!important;min-height:58px!important;display:grid!important;grid-template-columns:74px minmax(0,1fr)!important;grid-template-rows:1fr!important;gap:5px!important;padding:4px!important;overflow:hidden!important}
+html[data-tiles-layout="mobile-portrait"] .power-panel .panel-heading{display:none!important}
+html[data-tiles-layout="mobile-portrait"] .empty-slot,html[data-tiles-layout="mobile-portrait"] .power-card{grid-column:1!important;height:48px!important;min-height:48px!important;margin:0!important;padding:1px!important}
+html[data-tiles-layout="mobile-portrait"] .empty-slot div{font-size:16px!important}html[data-tiles-layout="mobile-portrait"] .empty-slot span{font-size:5px!important}
+html[data-tiles-layout="mobile-portrait"] .power-card{display:flex!important;flex-direction:column!important;justify-content:center!important;gap:1px!important}
+html[data-tiles-layout="mobile-portrait"] .power-card .power-sprite{transform:scale(.72)!important;margin:-3px 0!important}
+html[data-tiles-layout="mobile-portrait"] .power-card b{font-size:5.5px!important}html[data-tiles-layout="mobile-portrait"] .power-card small{display:none!important}
+html[data-tiles-layout="mobile-portrait"] .power-panel p{grid-column:2!important;margin:0!important;align-self:center!important;text-align:left!important;font-size:5.8px!important;line-height:1.28!important}
+html[data-tiles-layout="mobile-portrait"] .desktop-lobby-actions,html[data-tiles-layout="mobile-portrait"] .desktop-leave{display:none!important}
+html[data-tiles-layout="mobile-portrait"] .mobile-actionbar{display:grid!important;grid-template-columns:1fr 1fr!important;gap:4px!important;padding-top:4px!important}
+html[data-tiles-layout="mobile-portrait"] .mobile-actionbar button{height:40px!important;min-height:40px!important;padding:4px 5px!important;font-size:7px!important}
+
+/* Browser portrait is intentionally denser because Safari chrome steals vertical space. */
+html[data-tiles-layout-mode="mobile-portrait-browser"] .game-screen{padding-top:max(3px,var(--safe-top))!important;padding-bottom:max(3px,var(--safe-bottom))!important}
+html[data-tiles-layout-mode="mobile-portrait-browser"] .arcade-header{height:44px!important;min-height:44px!important}
+html[data-tiles-layout-mode="mobile-portrait-browser"] .arcade-header .tiles-logo img{max-height:33px!important}
+html[data-tiles-layout-mode="mobile-portrait-browser"] .game-grid{grid-template-rows:54px minmax(0,1fr) 52px!important;gap:3px!important;margin-top:3px!important}
+html[data-tiles-layout-mode="mobile-portrait-browser"] .power-panel{height:52px!important;min-height:52px!important}
+html[data-tiles-layout-mode="mobile-portrait-browser"] .empty-slot,html[data-tiles-layout-mode="mobile-portrait-browser"] .power-card{height:42px!important;min-height:42px!important}
+html[data-tiles-layout-mode="mobile-portrait-browser"] .mobile-actionbar button{height:36px!important;min-height:36px!important}
+html[data-tiles-layout-mode="mobile-portrait-browser"] .mobile-actionbar{padding-top:3px!important}
+
+/* LANDSCAPE: strict Power-Up | Arena | Players composition. */
+html[data-tiles-layout="mobile-landscape"] .arcade-header{
+  height:42px!important;min-height:42px!important;grid-template-columns:92px minmax(0,1fr) 58px!important;gap:4px!important;padding:2px 5px!important;
+}
+html[data-tiles-layout="mobile-landscape"] .arcade-header .tiles-logo img{max-height:34px!important;width:min(180px,76%)!important}
+html[data-tiles-layout="mobile-landscape"] .arcade-header strong{font-size:10px!important}html[data-tiles-layout="mobile-landscape"] .arcade-header small{font-size:5px!important}
+html[data-tiles-layout="mobile-landscape"] .room-copy{width:84px!important;min-width:0!important;padding:2px 5px!important;border-width:2px!important}
+html[data-tiles-layout="mobile-landscape"] .connection-strip{margin-top:2px!important;padding:1px 3px!important;font-size:5.5px!important}
+html[data-tiles-layout="mobile-landscape"] .game-grid{
+  margin-top:3px!important;height:auto!important;display:grid!important;
+  grid-template-columns:clamp(84px,13.5vw,112px) minmax(0,1fr) clamp(132px,20vw,170px)!important;
+  grid-template-rows:minmax(0,1fr)!important;gap:4px!important;align-items:stretch!important;
+}
+html[data-tiles-layout="mobile-landscape"] .power-panel{order:1!important;display:block!important;padding:4px!important;min-height:0!important;overflow:hidden!important}
+html[data-tiles-layout="mobile-landscape"] .arena-frame{order:2!important;height:100%!important;min-height:0!important;overflow:hidden!important}
+html[data-tiles-layout="mobile-landscape"] .players-panel{order:3!important;padding:4px!important;min-height:0!important;overflow:hidden!important}
+html[data-tiles-layout="mobile-landscape"] .game-canvas{height:100%!important;min-height:0!important;width:100%!important}
+html[data-tiles-layout="mobile-landscape"] .panel-heading{font-size:5.5px!important;padding-bottom:2px!important}
+html[data-tiles-layout="mobile-landscape"] .empty-slot,html[data-tiles-layout="mobile-landscape"] .power-card{height:50px!important;min-height:50px!important;margin-top:3px!important}
+html[data-tiles-layout="mobile-landscape"] .power-card .power-sprite{transform:scale(.72)!important;margin:-2px!important}
+html[data-tiles-layout="mobile-landscape"] .power-card b{font-size:5.5px!important}html[data-tiles-layout="mobile-landscape"] .power-card small{font-size:4px!important}
+html[data-tiles-layout="mobile-landscape"] .power-panel p{font-size:4.5px!important;line-height:1.15!important;margin:3px 0 0!important}
+html[data-tiles-layout="mobile-landscape"] .player-list{display:grid!important;grid-template-rows:repeat(5,minmax(0,1fr))!important;height:calc(100% - 16px)!important;gap:2px!important;margin-top:2px!important}
+html[data-tiles-layout="mobile-landscape"] .player-card{height:100%!important;min-height:0!important;grid-template-columns:24px minmax(0,1fr) 30px!important;gap:2px!important;padding:1px 2px!important}
+html[data-tiles-layout="mobile-landscape"] .player-card>img{width:23px!important;height:23px!important;transform:none!important}
+html[data-tiles-layout="mobile-landscape"] .player-card b{font-size:5.2px!important}html[data-tiles-layout="mobile-landscape"] .player-card small{font-size:3.8px!important;margin-top:0!important}
+html[data-tiles-layout="mobile-landscape"] .player-trophies{width:29px!important;min-width:29px!important;grid-template-columns:10px 16px!important;column-gap:1px!important}
+html[data-tiles-layout="mobile-landscape"] .player-trophies>img{width:10px!important;height:10px!important}html[data-tiles-layout="mobile-landscape"] .player-trophies .pixel-count{transform:scale(.19)!important}
+html[data-tiles-layout="mobile-landscape"] .desktop-lobby-actions,html[data-tiles-layout="mobile-landscape"] .desktop-leave{display:none!important}
+html[data-tiles-layout="mobile-landscape"] .mobile-actionbar{display:grid!important;grid-template-columns:1fr 1fr!important;gap:4px!important;padding-top:3px!important}
+html[data-tiles-layout="mobile-landscape"] .mobile-actionbar button{height:32px!important;min-height:32px!important;padding:2px 5px!important;font-size:6px!important}
+html[data-tiles-layout="mobile-landscape"] .mobile-leave-float{right:max(7px,var(--safe-right))!important;bottom:max(7px,var(--safe-bottom))!important}
+
+/* Browser landscape and compact PWA modes sacrifice decoration/board scale before controls. */
+html[data-tiles-layout-mode="mobile-landscape-browser"] .arcade-header,
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .arcade-header,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .arcade-header{height:36px!important;min-height:36px!important}
+html[data-tiles-layout-mode="mobile-landscape-browser"] .arcade-header .tiles-logo img,
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .arcade-header .tiles-logo img,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .arcade-header .tiles-logo img{max-height:28px!important}
+html[data-tiles-layout-mode="mobile-landscape-browser"] .game-grid,
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .game-grid,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .game-grid{grid-template-columns:82px minmax(0,1fr) 132px!important;gap:3px!important;margin-top:2px!important}
+html[data-tiles-layout-mode="mobile-landscape-browser"] .mobile-actionbar button,
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .mobile-actionbar button,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .mobile-actionbar button{height:28px!important;min-height:28px!important;font-size:5.5px!important}
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .power-panel p,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .power-panel p{display:none!important}
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .empty-slot,
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .power-card,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .empty-slot,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .power-card{height:42px!important;min-height:42px!important}
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .panel-heading,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .panel-heading{font-size:4.8px!important}
+
+/* Landing layout uses the same measured foreground viewport instead of 100vh. */
+html[data-tiles-layout="mobile-portrait"] .landing-screen,
+html[data-tiles-layout="mobile-landscape"] .landing-screen{width:var(--usable-width)!important;height:var(--usable-height)!important;min-height:0!important;overflow:hidden!important;padding:max(4px,var(--safe-top)) max(7px,var(--safe-right)) max(4px,var(--safe-bottom)) max(7px,var(--safe-left))!important}
+html[data-tiles-layout="mobile-portrait"] .landing-panel{width:min(94vw,500px)!important;max-height:calc(var(--usable-height) - max(10px,var(--safe-top)) - max(10px,var(--safe-bottom)))!important;overflow:auto!important;padding:14px 13px 11px!important}
+html[data-tiles-layout-mode="mobile-portrait-browser"] .landing-panel{padding:10px 12px 9px!important}
+html[data-tiles-layout-mode="mobile-portrait-browser"] .landing-panel .tiles-logo img{max-height:62px!important}
+html[data-tiles-layout="mobile-landscape"] .landing-panel{width:min(490px,58vw)!important;max-height:calc(var(--usable-height) - max(6px,var(--safe-top)) - max(6px,var(--safe-bottom)))!important;overflow:auto!important;padding:6px 12px!important}
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .landing-panel,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .landing-panel{width:min(450px,55vw)!important;padding:4px 10px!important}
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .how-to-strip,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .how-to-strip{display:none!important}
+html[data-tiles-layout-mode="mobile-landscape-browser-compact"] .landing-floats,
+html[data-tiles-layout-mode="mobile-landscape-pwa-compact"] .landing-floats{opacity:.45!important}
+
+/* Settings never extend behind Safari/Home indicator. */
+html[data-tiles-layout="mobile-portrait"] .settings-popover,
+html[data-tiles-layout="mobile-landscape"] .settings-popover{max-height:calc(var(--usable-height) - max(72px,var(--safe-top)) - max(8px,var(--safe-bottom)))!important;overflow:auto!important}
+html[data-tiles-layout="mobile-landscape"] .settings-popover{width:min(250px,42vw)!important;top:max(44px,calc(var(--safe-top) + 38px))!important;gap:4px!important;padding:6px!important}
+html[data-tiles-layout="mobile-landscape"] .volume-control{padding:5px!important;gap:4px!important}.settings-popover .volume-control>i{bottom:7px!important}

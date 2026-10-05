@@ -1,8 +1,8 @@
-# Tiles V0.8 — Full Pixel Competition Polish
+# Tiles V0.9 — Mobile Reliability / Audio / Session Intelligence
 
-Tiles is a realtime multiplayer pixel-arcade survival game by **Apogee Lab**. Players move across a 19-cell hex arena, then one player chooses a tile color to eliminate. The last character standing wins.
+Tiles is a realtime multiplayer pixel-arcade survival game by **Apogee Lab**. Players move across a 19-cell hex arena, one selected player chooses a tile color to eliminate, and the last character standing wins.
 
-V0.8 is a competition-polish pass: gameplay feedback is cleaner, abandoned Quick Play rooms cannot trap new players in stale bot matches, the endgame has stronger audiovisual escalation, and the visible interface has been unified around a custom pixel-art language.
+V0.9 is a reliability-focused release built on the V0.8 competition-polish baseline. It hardens iPhone/Safari/PWA layout behavior, replaces the background-music implementation with a foreground-only Web Audio controller, adds user volume sliders, removes completely inactive humans after a finished match, refreshes the favicon/PWA icon package, and makes bots more purposeful while still favoring living humans over bot targets.
 
 ## Stack
 
@@ -14,91 +14,89 @@ V0.8 is a competition-polish pass: gameplay feedback is cleaner, abandoned Quick
 - WebSockets with server-authoritative game state
 - no D1 required for active matches
 
-## Core match loop
+## Match loop
 
 `board flip → pre-round cue → 7.0 s movement → selector wheel → 5.0 s color choice → 1.65 s reveal/reaction → tile break/drop → results`
 
-Powerups are **Invisibility / Override / Phase Shift**:
+Powerups remain **Invisibility / Override / Phase Shift**. Click/tap activates a legal held powerup; desktop players may also press **Space**.
 
-- **Invisibility** hides the user's arena position from other clients for the rest of the round while leaving a translucent self-view.
-- **Override** is globally unique and guarantees its owner becomes the next selector.
-- **Phase Shift** teleports a threatened player to a safe tile during the reveal window.
+## V0.9 highlights
 
-Click/tap activates a legal held powerup; desktop players may also press **Space**.
+### Foreground-only audio manager
 
-## V0.8 highlights
+Music and sound effects are now owned by one persistent Web Audio manager with separate music and SFX buses. Tiles intentionally produces no audio while the document is hidden, the phone is locked, Safari/PWA is backgrounded, or the page is being hidden.
 
-### Cleaner movement feedback
+- `visibilitychange` and `pagehide` stop active music/SFX immediately and suspend the audio context.
+- Returning to the foreground restores only the soundtrack appropriate to the current game state.
+- Missed selector ticks, shuffle clicks, break cues, and podium cues are timestamp-guarded so stale sounds do not fire on resume.
+- Normal → Final Two music transition starts the destination source before retiring the working source, preventing a failed transition from intentionally creating silence.
+- A lightweight watchdog/recovery path restores the desired soundtrack after browser/iOS audio interruptions.
+- No Media Session metadata or deliberate OS-level background playback is registered.
 
-Moving characters may cross/slide past one another without server collision or recoil. Occupancy matters only at the player's **final selected destination**. If that destination is still occupied on arrival, the server stops the player on the previous valid tile. Humans receive a private red target flash and subtle error sound; bots use the same authoritative rule without client feedback.
+### Retuned audio mix + user volume controls
 
-### Quick Play always starts from a live human room
+The tuned music ceiling is approximately **35% quieter than V0.8** while the selector-wheel tick is **25% stronger**. Settings now expose pixel-art **Music Volume** and **Sound Effects** sliders from 0–100 in 5% steps. Both display 100 by default; those values multiply the tuned internal mix rather than exposing raw file gain. Preferences persist locally.
 
-A public room with zero connected humans is not eligible for Quick Play. An explicit last-human leave abandons the room immediately; unexpected disconnects retain the reconnect grace period. If no live human public room exists, Quick Play creates a fresh room.
+### Mobile layout rebuild
 
-### 250-name bot identity pool
+The runtime viewport controller now distinguishes actual mobile environments rather than squeezing a desktop composition into a phone viewport:
 
-Bots draw from exactly **250 preset names**: 85 human-style names/variants and 165 arcade/gamer names. Visible names remain unique within a room and never receive a BOT label.
+- mobile portrait PWA
+- mobile portrait browser
+- mobile landscape PWA
+- mobile landscape browser
+- compact landscape variants
+- desktop
 
-### Full pixel presentation
+It uses `visualViewport`, orientation, standalone detection, dynamic safe areas and measured usable width/height. Mobile gameplay reserves a protected READY / LEAVE action row and sacrifices decoration/arena size before essential controls. Portrait uses a compact horizontal roster; landscape uses `Power-Up | Arena | Players`.
 
-V0.8 ships a local **Tiles Pixel** bitmap-style font and uses it throughout the UI, including dynamic gamer tags, room codes, tutorial copy, buttons, settings, HUD labels, selector text and podium values. Inputs remain semantic browser controls underneath, but their visible treatment is pixel-art styled.
+The supplied V0.9 mobile screenshots are retained under `art-reference/mobile-v0.9/` as regression references.
 
-Buttons, cards, panels, toasts, selector components and settings controls use stepped pixel geometry, hard shadows and nearest-neighbor scaling. The selector wheel and pointer also use hard pixel silhouettes rather than smooth round browser UI.
+### Match-scoped inactivity cleanup
 
-### Final Two escalation
+Every real human begins a match with no activity credit. A meaningful in-game action grants credit for that match:
 
-The first transition to exactly two survivors triggers a one-shot framed **FINAL TWO** fly-through banner with a synchronized swoosh. It does not repeat if both players survive the next round.
+- move/destination input during movement;
+- manual color choice when that human is selector;
+- legal held-powerup activation during an allowed phase.
 
-The Final Two atmosphere then persists until match end:
+READY, settings interaction, background mouse/touch movement, timeout automation and spectating do not count. Bots are exempt. A human who performs zero meaningful game inputs is never interrupted mid-match; after the podium they are removed from the room, their reconnect identity is invalidated, and their client returns to the homepage with `REMOVED FOR INACTIVITY`.
 
-- higher-density/brighter shooting particles
-- hollow-center cross-shaped pixel stars
-- stronger arena-frame glow
-- a pitch-preserved soundtrack variant running roughly **15 BPM faster**
+### Global bot elimination governor
 
-The normal and Final Two tracks crossfade at approximately the equivalent musical position rather than restarting from the beginning.
+The original V0.8 bots-only endgame governor remains unchanged once no humans are alive. V0.9 adds a separate human-present governor so bots also help matches progress while humans are alive.
 
-### New sound pass
+When a forced-progress bot color would hit any living human, the server accepts that human-threatening candidate only **1/3 of the time** and rejects/rerolls it **2/3 of the time**. Bot-only target colors are therefore preferred, but humans are never immune. The process is bounded and hidden; the bot retains its normal visible 0.75–2.5 s selector delay.
 
-- a soft mechanical click follows each tile in the left-to-right board-flip wave
-- one ceramic break cue accompanies the doomed-color fracture/drop
-- blocked final destinations receive a private error cue
-- Final Two receives a one-shot swoosh
-- the podium fanfare begins after the podium has visually appeared
+### Current favicon everywhere
 
-All effects obey the **Sound FX** setting. Music and haptics remain separately configurable on the home screen.
+`index.html`, the manifest, Apple touch icon and PWA/browser favicon set now reference the approved current Tiles icon through cache-busted V0.9 filenames. Legacy icon filenames are also overwritten with the same artwork for fallback safety.
 
-### Podium and lobby flow
+## V0.8 systems preserved
 
-The podium still presents the top finishers, trophy totals and newest winner crown, but the winner sprite animation now snaps cleanly between atlas frames instead of sliding through the sheet. Trophy icons/counts have dedicated spacing.
+- full pixel-art visible UI and `Tiles Pixel` font
+- server-authoritative movement
+- moving players may cross; only the final destination is occupancy-blocked
+- private red flash + blocked sound when a human arrives at an occupied final target
+- same final-destination occupancy rule for bots
+- abandoned zero-human public rooms are not reused by Quick Play
+- 250 bot username pool with 85 human-style names
+- Final Two one-shot banner/swoosh and persistent atmosphere
+- pitch-preserved ~15 BPM faster Final Two soundtrack
+- podium fanfare, latest-winner crown and persistent room trophy counts
+- podium → ordinary lobby → READY again; no rematch modal
 
-After the podium, the room returns directly to the ordinary lobby. There is no REMATCH modal or special rematch button; every player simply presses **READY** again.
-
-## Official app icon
-
-The PWA/favicon package uses the approved Tiles character + Tiles logo icon in 512, 192, Apple-touch, 64, 32, 16 and ICO variants.
-
-## Cloudflare build settings
-
-- Build: `npm run build`
-- Deploy: `npx wrangler deploy`
-
-Bindings:
-
-- `GAME_ROOMS` → `GameRoom`
-- `MATCHMAKER` → `Matchmaker`
-
-## Local commands
+## Build / deploy
 
 ```bash
 npm install
-npm run check
-npm run dev
+npm run typecheck
+npm run build
+npx wrangler deploy
 ```
 
-The source was validated with strict client/server/node TypeScript passes using temporary local declaration stubs and a CSS parse check. Those validation stubs are not included in the release package. Package-registry access was unavailable in the environment that produced the ZIP, so the GitHub/Cloudflare pipeline remains the final fresh dependency + Vite production-build verification.
+Cloudflare should provide the existing Durable Object bindings for `GAME_ROOMS` and `MATCHMAKER`.
 
-## Audio licensing note
+## Validation note
 
-The V0.8 SFX source files were supplied by the project owner. This repository intentionally does not invent license terms for those files. See `licenses/V0.8_AUDIO_NOTES.md` and retain/verify the applicable source-page licenses before public distribution or contest submission.
+This build was source/type validated in the artifact environment with temporary local declaration stubs because registry-backed dependency installation was unavailable there. Those validation-only files are removed from the release package. A normal networked GitHub/Cloudflare build remains the final production Vite/Workers verification.

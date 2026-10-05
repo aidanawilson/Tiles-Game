@@ -1,0 +1,51 @@
+TILES V0.9 — MOBILE RELIABILITY / AUDIO / SESSION INTELLIGENCE
+2026-10-04
+
+MOBILE / VIEWPORT
+- Reworked mobile runtime layout classification into browser/PWA + portrait/landscape modes.
+- Added compact-landscape mode for constrained Safari/PWA visible heights.
+- Layout controller now publishes visualViewport-derived usable width/height CSS variables.
+- Mobile game screen uses protected structural regions so READY / LEAVE cannot be consumed by arena/panel growth.
+- Portrait uses compact horizontal roster; landscape preserves Power-Up | Arena | Players.
+- Added tighter landing/settings constraints for mobile browser viewports.
+- Added V0.9 user-supplied mobile regression screenshots under art-reference/mobile-v0.9/.
+
+AUDIO ARCHITECTURE
+- Replaced split HTMLAudioElement/WebAudio behavior with one persistent Web Audio manager.
+- Added separate music and SFX buses under a common master output.
+- Background/hidden/pagehide stops active Tiles audio immediately and suspends AudioContext.
+- Foreground resume restores only the desired current soundtrack.
+- Added recovery/watchdog path for browser/iOS AudioContext interruptions.
+- Normal and Final Two music are buffer-backed loop sources with normalized-position transitions.
+- Crossfade starts destination source before retiring the old source.
+- Added stale authoritative-timestamp guards to selector ticks, board flip clicks, tile break and podium cue scheduling.
+- No Media Session/background-player registration is used.
+
+AUDIO MIX / SETTINGS
+- Music tuned maximum reduced ~35% vs V0.8.
+- Selector wheel tick increased ~25% vs V0.8.
+- Replaced binary Music/SFX settings with pixel-art 0–100 volume sliders in 5% steps.
+- Both sliders default visually to 100 and multiply tuned internal ceilings.
+- Volume preferences persist and migrate from old on/off keys.
+
+INACTIVITY
+- Added match-scoped meaningful-input tracking for real humans.
+- Movement, manual selector choice, and legal held-powerup input count as gameplay activity.
+- READY/settings/passive connection/timeout behavior/spectating do not count.
+- Zero-input human remains through the match and podium, then is removed.
+- Inactivity removal invalidates reconnect identity and returns that client home with REMOVED FOR INACTIVITY.
+- Public room is abandoned if inactivity cleanup removes its final human.
+
+BOT INTELLIGENCE
+- Added separate human-present bot elimination governor while preserving V0.8 bots-only governor behavior.
+- During forced progress with humans alive, bot-only target colors are preferred.
+- Human-containing target candidates are accepted 1/3 of the time and rejected 2/3 of the time.
+- Mixed bot/human colors count as human-containing.
+- Rerolls are bounded; no infinite selection loop.
+- Bot never intentionally chooses selector's own current color.
+- Visible bot selector delay remains unchanged.
+
+ICON / PWA
+- Regenerated current approved icon into V0.9 cache-busted favicon, Apple touch, 192 and 512 assets.
+- Updated HTML and manifest references.
+- Overwrote legacy icon fallback filenames with current artwork.

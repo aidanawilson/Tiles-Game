@@ -22,6 +22,8 @@ interface StoredRoom {
     botPlayerIds: string[];
     nextBotAt?: number | null;
     botEndgame?: BotEndgameState;
+    botHumanGovernor?: BotEndgameState;
+    humanInputThisMatch?: string[];
 }
 const STORAGE_KEY = "room";
 const BOT_PREFIX = ["Nova", "Pixel", "Orbit", "Echo", "Drift", "Neon", "Turbo", "Astro", "Lunar", "Vapor", "Solar", "Kilo", "Mango", "Comet", "Vector", "Rocket", "Hyper", "Static", "Cloud", "Arcade"];
@@ -148,6 +150,8 @@ export class GameRoom extends DurableObject<Env> {
     private nextBotAt: number | null = null;
     private botTimers = new Set<ReturnType<typeof setTimeout>>();
     private botEndgame: BotEndgameState = { active: false, graceRounds: 1, roundsWithoutElimination: 0, previousGraceRounds: null };
+    private botHumanGovernor: BotEndgameState = { active: false, graceRounds: 1, roundsWithoutElimination: 0, previousGraceRounds: null };
+    private humanInputThisMatch = new Set<string>();
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
         this.ctx.blockConcurrencyWhile(async () => {
@@ -162,6 +166,8 @@ export class GameRoom extends DurableObject<Env> {
             this.botPlayerIds = new Set(stored.botPlayerIds ?? []);
             this.nextBotAt = stored.nextBotAt ?? null;
             this.botEndgame = stored.botEndgame ?? { active: false, graceRounds: 1, roundsWithoutElimination: 0, previousGraceRounds: null };
+            this.botHumanGovernor = stored.botHumanGovernor ?? { active: false, graceRounds: 1, roundsWithoutElimination: 0, previousGraceRounds: null };
+            this.humanInputThisMatch = new Set(stored.humanInputThisMatch ?? []);
             this.state.room ??= { visibility: "private", botsEnabled: false, quickPlay: false, rosterLocked: false, startCommitted: false };
             this.state.selectorCandidates ??= [];
             this.state.previousTiles ??= null;
@@ -281,12 +287,15 @@ export class GameRoom extends DurableObject<Env> {
                     this.commitStart(false);
                 break;
             case "move":
+                if (this.state.phase === "movement" && p.alive && !this.botPlayerIds.has(p.id)) this.humanInputThisMatch.add(p.id);
                 this.requestMove(p, m.tileId);
                 break;
             case "choose-color":
+                if (this.state.phase === "selector-choice" && this.state.selectorId === p.id && !this.botPlayerIds.has(p.id)) this.humanInputThisMatch.add(p.id);
                 this.chooseColor(p, m.color);
                 break;
             case "use-powerup":
+                if (p.alive && p.powerup && !this.botPlayerIds.has(p.id) && (this.state.phase === "movement" || this.state.phase === "reveal")) this.humanInputThisMatch.add(p.id);
                 this.usePowerup(p);
                 break;
             case "leave-room":
@@ -442,7 +451,7 @@ export class GameRoom extends DurableObject<Env> {
         } }, delay);
         this.botTimers.add(timer);
     }
-    private removeBot(pid: string, persist = true) { this.state.players = this.state.players.filter(p => p.id !== pid); this.botPlayerIds.delete(pid); delete this.state.fairness.cycleCounts[pid]; this.state.fairness.doubledPlayers = this.state.fairness.doubledPlayers.filter(x => x !== pid); if (persist)
+    private removeBot(pid: string, persist = true) { this.state.players = this.state.players.filter(p => p.id !== pid); this.botPlayerIds.delete(pid); delete this.state.fairness.cycleCounts[pid]; this.humanInputThisMatch.delete(pid); this.state.fairness.doubledPlayers = this.state.fairness.doubledPlayers.filter(x => x !== pid); if (persist)
         this.persistSoon(); }
     private evaluateLobbyStart() {
         if (this.state.room.startCommitted || this.state.phase !== "lobby")
@@ -516,7 +525,12 @@ export class GameRoom extends DurableObject<Env> {
         this.state.finalTwoAnnouncedAt = null;
         this.state.overridePendingPlayerId = null;
         this.state.overrideActivatedAt = null;
+        this.humanInputThisMatch.clear();
+        // Keep the original no-human governor isolated so human-match behavior can never
+        // alter its grace history or cadence.
         this.botEndgame = { active: false, graceRounds: 1, roundsWithoutElimination: 0, previousGraceRounds: this.botEndgame.previousGraceRounds };
+        this.botHumanGovernor = { active: this.botPlayers().filter(p => p.alive).length > 1, graceRounds: 1, roundsWithoutElimination: 0, previousGraceRounds: this.botHumanGovernor.previousGraceRounds };
+        if (this.botHumanGovernor.active) this.rollHumanBotGraceRounds();
         this.prepareRound();
     }
     private prepareRound() {
@@ -737,6 +751,21 @@ export class GameRoom extends DurableObject<Env> {
         this.broadcastState();
     }
     private returnToLobby() {
+        this.removeInactiveHumansAfterMatch();
+        this.humanInputThisMatch.clear();
+        if (this.state.room.visibility === "public" && this.humanPlayers().length === 0) {
+            this.created = false;
+            this.stopMovementLoop();
+            this.clearBotTimers();
+            if (this.phaseTimer) clearTimeout(this.phaseTimer);
+            if (this.botFillTimer) clearTimeout(this.botFillTimer);
+            this.phaseTimer = null;
+            this.botFillTimer = null;
+            this.botPlayerIds.clear();
+            this.state.players = [];
+            void this.ctx.storage.deleteAll();
+            return;
+        }
         this.state.phase = "lobby";
         this.state.phaseEndsAt = null;
         this.state.room.rosterLocked = false;
@@ -759,6 +788,27 @@ export class GameRoom extends DurableObject<Env> {
         }
         this.persistSoon();
         this.broadcastState();
+    }
+    private removeInactiveHumansAfterMatch() {
+        const inactive = this.humanPlayers().filter(p => !this.humanInputThisMatch.has(p.id));
+        if (!inactive.length) return;
+        const ids = new Set(inactive.map(p => p.id));
+        const now = Date.now();
+        for (const p of inactive) {
+            this.sendToPlayer(p.id, { type: "removed-inactivity", serverTime: now });
+            for (const socket of this.ctx.getWebSockets()) {
+                if ((socket.deserializeAttachment() as SocketAttachment | null)?.playerId !== p.id) continue;
+                try { socket.close(4001, "Removed for inactivity"); } catch { }
+            }
+            delete this.reconnectTokens[p.id];
+            delete this.disconnectedAt[p.id];
+            delete this.state.fairness.cycleCounts[p.id];
+        }
+        this.state.players = this.state.players.filter(p => !ids.has(p.id));
+        this.state.fairness.doubledPlayers = this.state.fairness.doubledPlayers.filter(id => !ids.has(id));
+        this.state.selectorCandidates = this.state.selectorCandidates.filter(id => !ids.has(id));
+        if (this.state.lastWinnerId && ids.has(this.state.lastWinnerId)) this.state.lastWinnerId = null;
+        this.transferHost();
     }
     private requestMove(p: PlayerState, tileId: number) {
         if (this.state.phase !== "movement" || !p.alive)
@@ -1000,52 +1050,118 @@ export class GameRoom extends DurableObject<Env> {
         this.botEndgame.graceRounds = next;
         this.botEndgame.roundsWithoutElimination = 0;
     }
+    private rollHumanBotGraceRounds() {
+        let next = 1 + randInt(3);
+        while (this.botHumanGovernor.previousGraceRounds === 3 && next === 3)
+            next = 1 + randInt(3);
+        this.botHumanGovernor.previousGraceRounds = next;
+        this.botHumanGovernor.graceRounds = next;
+        this.botHumanGovernor.roundsWithoutElimination = 0;
+    }
     private updateBotEndgame(goneIds: string[]) {
         const humansAlive = this.humanPlayers().filter(p => p.alive).length;
         const botsAlive = this.botPlayers().filter(p => p.alive).length;
-        if (humansAlive > 0 || botsAlive <= 1) {
-            this.botEndgame.active = false;
-            this.botEndgame.roundsWithoutElimination = 0;
+
+        if (humansAlive === 0) {
+            // ORIGINAL v0.8 BOT-ONLY GOVERNOR — intentionally unchanged.
+            if (botsAlive <= 1) {
+                this.botEndgame.active = false;
+                this.botEndgame.roundsWithoutElimination = 0;
+                return;
+            }
+            const botDied = goneIds.some(pid => this.botPlayerIds.has(pid));
+            if (!this.botEndgame.active) {
+                this.botEndgame.active = true;
+                this.rollBotGraceRounds();
+                return;
+            }
+            if (botDied) {
+                this.rollBotGraceRounds();
+                return;
+            }
+            this.botEndgame.roundsWithoutElimination++;
             return;
         }
-        const botDied = goneIds.some(pid => this.botPlayerIds.has(pid));
-        if (!this.botEndgame.active) {
-            this.botEndgame.active = true;
-            this.rollBotGraceRounds();
+
+        // v0.9 human-present governor. It runs in parallel with, but never mutates,
+        // the original bot-only governor above.
+        this.botEndgame.active = false;
+        this.botEndgame.roundsWithoutElimination = 0;
+        if (botsAlive <= 1) {
+            this.botHumanGovernor.active = false;
+            this.botHumanGovernor.roundsWithoutElimination = 0;
             return;
         }
-        if (botDied) {
-            this.rollBotGraceRounds();
+        if (!this.botHumanGovernor.active) {
+            this.botHumanGovernor.active = true;
+            this.rollHumanBotGraceRounds();
             return;
         }
-        this.botEndgame.roundsWithoutElimination++;
+        // Any natural elimination means the round progressed, so grant another grace window.
+        if (goneIds.length > 0) {
+            this.rollHumanBotGraceRounds();
+            return;
+        }
+        this.botHumanGovernor.roundsWithoutElimination++;
     }
     private pickBotSelectorColor(bot: PlayerState): TileColor {
         const own = this.state.tiles.find(t => t.id === bot.tileId)?.color;
         const safeChoices = TILE_COLORS.filter(c => c !== own);
-        if (!safeChoices.length)
-            return TILE_COLORS[0];
-        const force = this.botEndgame.active && this.botEndgame.roundsWithoutElimination >= this.botEndgame.graceRounds;
-        if (force) {
+        if (!safeChoices.length) return TILE_COLORS[0];
+        const humansAlive = this.humanPlayers().filter(p => p.alive);
+
+        if (!humansAlive.length) {
+            const force = this.botEndgame.active && this.botEndgame.roundsWithoutElimination >= this.botEndgame.graceRounds;
+            if (!force) return safeChoices[randInt(safeChoices.length)];
+            // ORIGINAL v0.8 target rule: exactly one bot first, otherwise fewest bots.
             const opponentBots = this.botPlayers().filter(p => p.alive && p.id !== bot.id);
             const occupancy = new Map<TileColor, number>();
             for (const opponent of opponentBots) {
                 const c = this.state.tiles.find(t => t.id === opponent.tileId)?.color;
-                if (c && c !== own)
-                    occupancy.set(c, (occupancy.get(c) ?? 0) + 1);
+                if (c && c !== own) occupancy.set(c, (occupancy.get(c) ?? 0) + 1);
             }
             const targets = [...occupancy.entries()].filter(([, count]) => count > 0);
             const singles = targets.filter(([, count]) => count === 1).map(([c]) => c);
-            if (singles.length)
-                return singles[randInt(singles.length)];
+            if (singles.length) return singles[randInt(singles.length)];
             if (targets.length) {
                 const min = Math.min(...targets.map(([, count]) => count));
                 const fewest = targets.filter(([, count]) => count === min).map(([c]) => c);
-                if (fewest.length)
-                    return fewest[randInt(fewest.length)];
+                if (fewest.length) return fewest[randInt(fewest.length)];
+            }
+            return safeChoices[randInt(safeChoices.length)];
+        }
+
+        const force = this.botHumanGovernor.active && this.botHumanGovernor.roundsWithoutElimination >= this.botHumanGovernor.graceRounds;
+        if (!force) return safeChoices[randInt(safeChoices.length)];
+
+        // Forced progress while a human is alive. Candidate colors keep the original
+        // fewest-opponents preference, but any color containing a human is accepted only
+        // 1/3 of the time. Rejected human colors let the search spill into later tiers,
+        // so bot-only targets are strongly preferred without making humans immune.
+        const opponents = this.state.players.filter(p => p.alive && p.id !== bot.id);
+        const byColor = new Map<TileColor, { total: number; humans: number }>();
+        for (const opponent of opponents) {
+            const color = this.state.tiles.find(t => t.id === opponent.tileId)?.color;
+            if (!color || color === own) continue;
+            const entry = byColor.get(color) ?? { total: 0, humans: 0 };
+            entry.total++;
+            if (!this.botPlayerIds.has(opponent.id)) entry.humans++;
+            byColor.set(color, entry);
+        }
+        const targetColors = [...byColor.keys()];
+        if (!targetColors.length) return safeChoices[randInt(safeChoices.length)];
+        const counts = [...new Set(targetColors.map(c => byColor.get(c)!.total))].sort((a,b) => a-b);
+        for (let pass = 0; pass < 4; pass++) {
+            for (const count of counts) {
+                for (const color of shuffled(targetColors.filter(c => byColor.get(c)!.total === count))) {
+                    const entry = byColor.get(color)!;
+                    if (entry.humans === 0) return color;
+                    if (randInt(3) === 0) return color;
+                }
             }
         }
-        return safeChoices[randInt(safeChoices.length)];
+        // Bounded fallback prevents pathological reroll loops when every legal target has a human.
+        return targetColors[randInt(targetColors.length)];
     }
     private selectorEligiblePlayers() { const alive = this.state.players.filter(p => p.alive && (p.connected || this.botPlayerIds.has(p.id))); if (!alive.length)
         return []; const counts = this.state.fairness.cycleCounts; for (const p of alive)
@@ -1086,7 +1202,7 @@ export class GameRoom extends DurableObject<Env> {
         p.host = false; const h = this.connectedHumans()[0] ?? this.humanPlayers()[0]; if (h)
         h.host = true; }
     private async leavePlayer(pid: string) { const p = this.state.players.find(x => x.id === pid); if (!p)
-        return; const wasHost = p.host, wasAlive = p.alive; this.state.players = this.state.players.filter(x => x.id !== pid); delete this.reconnectTokens[pid]; delete this.disconnectedAt[pid]; delete this.state.fairness.cycleCounts[pid]; this.state.fairness.doubledPlayers = this.state.fairness.doubledPlayers.filter(x => x !== pid); this.state.selectorCandidates = this.state.selectorCandidates.filter(x => x !== pid); if (this.state.selectorId === pid)
+        return; const wasHost = p.host, wasAlive = p.alive; this.state.players = this.state.players.filter(x => x.id !== pid); delete this.reconnectTokens[pid]; delete this.disconnectedAt[pid]; delete this.state.fairness.cycleCounts[pid]; this.humanInputThisMatch.delete(pid); this.state.fairness.doubledPlayers = this.state.fairness.doubledPlayers.filter(x => x !== pid); this.state.selectorCandidates = this.state.selectorCandidates.filter(x => x !== pid); if (this.state.selectorId === pid)
         this.state.selectorId = null; if (this.state.overridePendingPlayerId === pid) { this.state.overridePendingPlayerId = null; this.state.overrideActivatedAt = null; } if (wasHost)
         this.transferHost(); if (this.state.players.length === 0) {
         this.created = false;
@@ -1121,6 +1237,7 @@ export class GameRoom extends DurableObject<Env> {
         delete this.disconnectedAt[x];
         delete this.reconnectTokens[x];
         delete this.state.fairness.cycleCounts[x];
+        this.humanInputThisMatch.delete(x);
     }
     if (this.state.room.visibility === "public" && this.humanPlayers().length === 0) {
         this.created = false;
@@ -1187,7 +1304,7 @@ export class GameRoom extends DurableObject<Env> {
     }
     catch { } }
     private persistSoon() { void this.persist(); }
-    private async persist() { await this.ctx.storage.put<StoredRoom>(STORAGE_KEY, { created: this.created, state: this.state, reconnectTokens: this.reconnectTokens, disconnectedAt: this.disconnectedAt, botPlayerIds: [...this.botPlayerIds], nextBotAt: this.nextBotAt, botEndgame: this.botEndgame }); }
+    private async persist() { await this.ctx.storage.put<StoredRoom>(STORAGE_KEY, { created: this.created, state: this.state, reconnectTokens: this.reconnectTokens, disconnectedAt: this.disconnectedAt, botPlayerIds: [...this.botPlayerIds], nextBotAt: this.nextBotAt, botEndgame: this.botEndgame, botHumanGovernor: this.botHumanGovernor, humanInputThisMatch: [...this.humanInputThisMatch] }); }
 }
 function blankMotionStep(p: PlayerState) { p.movingFromTileId = null; p.movingToTileId = null; p.moveStartedAt = null; p.moveEndsAt = null; }
 

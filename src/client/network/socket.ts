@@ -3,12 +3,14 @@ type StateListener = (state: GameState, serverTime: number) => void;
 type ErrorListener = (message: string) => void;
 type ConnectionListener = (status: "connecting" | "connected" | "reconnecting" | "closed") => void;
 type BlockedDestinationListener = (tileId: number, serverTime: number) => void;
+type InactivityListener = (serverTime: number) => void;
 export class RoomSocket {
     private ws: WebSocket | null = null;
     private stateListeners = new Set<StateListener>();
     private errorListeners = new Set<ErrorListener>();
     private connectionListeners = new Set<ConnectionListener>();
     private blockedDestinationListeners = new Set<BlockedDestinationListener>();
+    private inactivityListeners = new Set<InactivityListener>();
     private closedByUser = false;
     private reconnectTimer: number | null = null;
     private reconnectAttempt = 0;
@@ -34,10 +36,15 @@ export class RoomSocket {
             this.handleMessage(String(event.data)); });
         ws.addEventListener("error", () => { if (!this.welcomed)
             this.emitError("Could not connect to this room."); });
-        ws.addEventListener("close", () => {
+        ws.addEventListener("close", (event) => {
             if (ws !== this.ws)
                 return;
             this.ws = null;
+            if (event.code === 4001) {
+                this.closedByUser = true;
+                this.inactivityListeners.forEach((listener) => listener(Date.now()));
+                return this.emitConnection("closed");
+            }
             if (this.closedByUser)
                 return this.emitConnection("closed");
             this.scheduleReconnect();
@@ -60,6 +67,7 @@ export class RoomSocket {
     onError(listener: ErrorListener) { this.errorListeners.add(listener); return () => this.errorListeners.delete(listener); }
     onConnection(listener: ConnectionListener) { this.connectionListeners.add(listener); return () => this.connectionListeners.delete(listener); }
     onBlockedDestination(listener: BlockedDestinationListener) { this.blockedDestinationListeners.add(listener); return () => this.blockedDestinationListeners.delete(listener); }
+    onInactiveRemoval(listener: InactivityListener) { this.inactivityListeners.add(listener); return () => this.inactivityListeners.delete(listener); }
     send(message: ClientMessage) { if (this.ws?.readyState === WebSocket.OPEN)
         this.ws.send(JSON.stringify(message)); }
     private handleMessage(raw: string) {
@@ -86,6 +94,10 @@ export class RoomSocket {
         }
         if (message.type === "blocked-destination") {
             this.blockedDestinationListeners.forEach((listener) => listener(message.tileId, message.serverTime));
+            return;
+        }
+        if (message.type === "removed-inactivity") {
+            this.inactivityListeners.forEach((listener) => listener(message.serverTime));
             return;
         }
         if (message.type === "error")

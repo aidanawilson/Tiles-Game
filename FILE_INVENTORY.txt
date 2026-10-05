@@ -1,4 +1,4 @@
-TILES V0.8 FILE INVENTORY
+TILES V0.9 FILE INVENTORY
 Generated: 2026-10-04
 
 .github/workflows/ci.yml
@@ -10,6 +10,7 @@ CHANGELOG_v0.5.txt
 CHANGELOG_v0.6.txt
 CHANGELOG_v0.7.txt
 CHANGELOG_v0.8.txt
+CHANGELOG_v0.9.txt
 FILE_INVENTORY.txt
 GAME_SPEC.md
 README.md
@@ -23,6 +24,13 @@ art-reference/mobile-layout-3390.jpeg
 art-reference/mobile-layout-3391.jpeg
 art-reference/mobile-layout-3392.jpeg
 art-reference/mobile-layout-3393.jpeg
+art-reference/mobile-v0.9/IMG_3400.jpeg
+art-reference/mobile-v0.9/IMG_3401.jpeg
+art-reference/mobile-v0.9/IMG_3402.jpeg
+art-reference/mobile-v0.9/IMG_3403.jpeg
+art-reference/mobile-v0.9/IMG_3404.jpeg
+art-reference/mobile-v0.9/IMG_3405.jpeg
+art-reference/mobile-v0.9/IMG_3406.jpeg
 art-reference/mobile/IMG_3385.jpeg
 art-reference/mobile/IMG_3386.jpeg
 art-reference/mobile/IMG_3387.png
@@ -41,6 +49,7 @@ art-reference/player-panel-reference.jpeg
 art-reference/retro_robot_ghost_sprite_sheet.png
 index.html
 licenses/V0.8_AUDIO_NOTES.md
+licenses/V0.9_AUDIO_SYSTEM_NOTES.md
 licenses/retro-arcade-theme-license.png
 package.json
 public/assets/apogee-lab-logo.png
@@ -74,13 +83,20 @@ public/audio/sfx/tile-break.mp3
 public/audio/sfx/tile-flip-click.mp3
 public/fonts/tiles-pixel.ttf
 public/fonts/tiles-pixel.woff2
+public/icons/apple-touch-icon-v9.png
 public/icons/apple-touch-icon.png
 public/icons/favicon-16.png
 public/icons/favicon-32.png
+public/icons/favicon-v9-16.png
+public/icons/favicon-v9-32.png
+public/icons/favicon-v9-64.png
+public/icons/favicon-v9.ico
 public/icons/favicon.ico
 public/icons/icon-192.png
 public/icons/icon-512.png
 public/icons/icon-64.png
+public/icons/icon-v9-192.png
+public/icons/icon-v9-512.png
 public/manifest.webmanifest
 src/client/App.tsx
 src/client/audio.ts

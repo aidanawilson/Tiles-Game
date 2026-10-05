@@ -1,39 +1,38 @@
-# Tiles V0.8 — Game Specification
+# Tiles V0.9 — Game Specification
 
 ## Match format
 
 - 19-cell hex arena (`BOARD_RADIUS = 2`).
 - Up to five characters.
-- Quick Play, Public, and Private + Bots ON begin matches with exactly five characters.
+- Quick Play, Public, and Private + Bots ON begin matches with five characters.
 - Private + Bots OFF uses the actual 2–5 human roster.
 - One life per match; eliminated players spectate.
-- Last survivor wins and earns one persistent room/session trophy.
+- Last survivor earns one persistent room/session trophy.
 - The most recent winner owns the gold crown until another player wins.
 
 ## Round phases
 
-1. **Shuffle** — current tiles flip into their newly randomized colors in a left-to-right wave.
-2. **Pre-round** — three short cues and a brighter GO cue provide a planning beat.
+1. **Shuffle** — tiles flip into newly randomized colors in a left-to-right wave.
+2. **Pre-round** — planning beat / countdown.
 3. **Movement** — exactly 7.0 seconds with visible tenths timer.
-4. **Selector wheel** — authoritative selector result; wheel visually lands on that exact player.
+4. **Selector wheel** — server-authoritative selector result.
 5. **Selector choice** — exactly 5.0 seconds to choose a doomed color.
 6. **Reveal** — 1.65-second reaction window; Phase Shift may be used if threatened.
 7. **Drop / results** — selected-color tiles break/fall; doomed characters fall with them.
-8. Continue until <=1 character remains alive.
+8. Repeat until <=1 character remains alive.
 
 ## Movement
 
 - Tap/click a destination tile.
-- The server pathfinds toward that tile.
-- Moving characters may cross/slide visually past one another. Intermediate route cells do **not** create player collisions, knockback, recoil or path cancellation.
-- Final destination occupancy is authoritative.
-- The player may target an occupied tile because its occupant might leave before arrival.
-- If the final target is empty at arrival, the mover enters it.
-- If the final target is still occupied, the mover remains on the previous valid tile and their movement command ends.
-- Humans receive a private red double-flash on the target and a blocked-destination SFX. Other clients do not see/hear that cue.
-- Bots use the same final-destination rule without human UI feedback.
-- Simultaneous final claims are resolved deterministically server-side; one player can own a tile at a time.
-- The player's selected destination retains a local-only glow while traveling.
+- The server pathfinds toward the target.
+- Moving characters may cross/slide visually past one another; intermediate route cells do not cause knockback, bump loops or collision cancellation.
+- An occupied tile may still be targeted because its occupant could move before arrival.
+- Occupancy is enforced only when entering the **final selected destination**.
+- If final target is free on arrival, enter normally.
+- If final target is still occupied, stop on the previous valid tile and end that command.
+- Humans receive a private red double-flash plus blocked-destination SFX; other clients do not.
+- Bots use the exact same server occupancy rule without human-facing feedback.
+- Simultaneous final claims resolve server-side with one tile owner.
 
 ## Powerups
 
@@ -41,113 +40,159 @@ One inventory slot per player.
 
 ### Invisibility
 - Manually activated during movement.
-- Other clients receive no visible board sprite for that player for the rest of the round.
-- The owner sees a translucent/glitching self representation.
-- Player remains physically present in server occupancy and remains visible in player list.
-- Effect ends at the round boundary.
+- Other clients do not see the owner's arena sprite for the rest of that round.
+- Owner retains translucent/glitching self-view.
+- Server occupancy remains real.
 
 ### Override
 - Globally unique across board, inventory and pending-selector state.
-- Activating it guarantees its owner is the **next selector**.
-- The authoritative wheel still spins and lands on that owner.
-- Only the owner receives the blue/electric OVERRIDE wheel treatment.
-- Consumed after the guaranteed selector event.
+- Guarantees its owner becomes next selector.
+- The authoritative wheel still spins/lands on that owner.
+- Only the owner sees the blue/electric Override wheel treatment.
 
 ### Phase Shift
 - Emergency reveal-window powerup.
-- If player is on the doomed color, activation teleports them to a random valid safe unoccupied non-doomed tile.
-- Yellow source/destination lightning effect communicates the teleport.
+- If threatened by the doomed color, teleports to a random safe unoccupied non-doomed tile.
+- Uses yellow source/destination lightning effect.
 
-Desktop shortcut: **Spacebar** activates a currently legal held powerup, except while typing in an editable control.
+Desktop **Spacebar** activates a legal held powerup except while typing.
 
 ## Selector fairness
 
-- Normal selector logic uses the existing modified fairness cycle.
+- Modified fairness cycle remains authoritative.
 - Eliminated players are excluded.
-- Override temporarily supersedes fairness for one selector event.
-- Wheel visuals always derive their landing wedge from the server-authoritative selector ID.
+- Override supersedes fairness for one selector event.
+- Wheel graphics always derive from the server's selector ID.
 
 ## Bots
 
-- Bots use the same movement and tile occupancy rules as humans.
-- Each movement phase they choose roughly 2–6 waypoint destinations with natural pauses.
+- Same movement/final-occupancy rules as humans.
+- Roughly 2–6 movement waypoints per movement phase with natural pauses.
 - Bots may collect/use powerups.
-- Bot selector delay remains randomized around 0.75–2.5 seconds.
+- Selector delay remains randomized about 0.75–2.5 seconds.
+- Forced-progress logic never intentionally selects the bot selector's own current color.
 
-### Bots-only endgame governor
+### Human-present elimination governor — V0.9
+
+While at least one real human is alive and at least two bots are alive, a separate progress governor runs throughout the match.
+
+- It receives a 1–3-round grace window and avoids consecutive 3-round grace values.
+- Any natural elimination grants another grace window.
+- Once grace expires, a selected bot seeks opponent-bearing target colors, prioritizing lower opponent occupancy.
+- A candidate containing **no living human** is accepted immediately.
+- A candidate containing any living human is accepted with **1/3 probability** and rejected with **2/3 probability**.
+- A mixed color containing both bots and a human still receives the human-protection roll.
+- Rejected candidates are evaluated internally within bounded passes; no unbounded reroll loop is permitted.
+- If every legal opponent target is human-containing and repeatedly rejected, a bounded legal-target fallback prevents deadlock.
+- This hidden decision process does not remove the normal 0.75–2.5 s visible selector delay.
+- Humans are favored, not immune.
+
+### Bots-only endgame governor — preserved from V0.8
 
 When no real human remains alive and more than one bot survives:
 
-- roll 1–3 grace rounds after entering bots-only play and after every bot elimination;
+- roll 1–3 grace rounds after entering bots-only play and after every natural bot elimination;
 - a grace value of 3 may never occur twice consecutively;
-- if a natural bot death occurs, reset the no-elimination counter and reroll;
-- after grace expires, the selected bot attempts a rational elimination:
-  1. prefer a color occupied by exactly one opponent;
-  2. otherwise choose the least-populated opponent color;
-  3. never intentionally choose its own current color;
-  4. if no safe opponent target exists, make a normal safe choice and carry the forced-progress requirement forward.
-- Never secretly reposition bots to manufacture a death.
+- after grace expires, prefer a color occupied by exactly one opponent bot;
+- otherwise choose the least-populated opponent-bot color;
+- never intentionally choose selector's own current color;
+- if no safe opponent target exists, make a normal legal safe choice and carry the progress need forward;
+- never secretly reposition bots to manufacture a death.
+
+The human-present governor is separate so it does not alter the original bots-only governor's grace history.
 
 ## Public matchmaking / room lifecycle
 
-- Public rooms are tracked by the Matchmaker Durable Object.
-- Quick Play reuses only joinable public rooms with **at least one connected real human**.
+- Public rooms are tracked by Matchmaker Durable Object.
+- Quick Play reuses only joinable public rooms containing at least one connected real human.
 - If none exists, create a fresh public room.
-- Real humans replace bots before roster lock.
-- Public/bot-enabled matches guarantee five characters at start.
-- The committed eight-second lobby countdown cannot be cancelled by readiness/join/leave changes.
-- Explicit last-human leave abandons the public room immediately and removes its reusable state.
-- Unexpected disconnects retain reconnect grace; the human may reclaim their identity during that window.
+- Humans replace bots before roster lock.
+- Public/bot-enabled matches fill to five characters at start.
+- Committed eight-second lobby countdown is not cancelled by readiness/join/leave changes.
+- Explicit last-human leave abandons the public room immediately.
+- Unexpected disconnects retain reconnect grace.
+- Post-match inactivity removal that leaves a public room with zero humans also abandons it.
 
-## Bot fill and readiness
+## Inactivity policy — V0.9
 
-- First bot after a new public human lobby: exactly 4.6 s.
-- Subsequent bot fills: randomized 3.6–4.6 s.
-- Humans can replace bots while matchmaking remains open.
-- Readiness threshold counts humans only:
-  - 1 human → 1 ready
-  - 2 humans → 2 ready
-  - 3 humans → 2 ready
-  - 4 humans → 3 ready
-  - 5 humans → 3 ready
-- Bot ready displays may be staggered for presentation but never count toward human threshold.
+At committed match start, each real human's `madeGameInputThisMatch` state is effectively false.
+
+Meaningful activity is granted for a valid-context attempt to:
+- move during movement while alive;
+- choose a color while that human is the selector;
+- use a held powerup while alive during a legal activation phase.
+
+The attempted gameplay input counts even when the eventual game outcome is blocked or unsuccessful.
+
+The following do not count:
+- lobby READY;
+- settings / volume / haptics changes;
+- passive connection;
+- mouse/pointer movement;
+- server timeout choices;
+- spectating.
+
+Bots are exempt. Nobody is kicked during the match. After the podium, any zero-input human is sent `removed-inactivity`, their room reconnect credentials are invalidated, they are removed from the roster, and their client returns home with a `REMOVED FOR INACTIVITY` notice.
 
 ## Final Two
 
-- Trigger atmosphere whenever exactly two survivors remain.
-- Announcement/swoosh is **one-shot per match**, triggered only on the first transition to two survivors.
-- Persistent Final Two mode increases particle speed/density, star activity and arena glow.
-- Music crossfades to a pitch-preserved version running approximately 15 BPM faster.
-- If both survive a later round, atmosphere remains but announcement/swoosh do not replay.
+- Exactly two survivors activates persistent Final Two atmosphere.
+- Banner + swoosh fires once on the first 3+ → 2 transition only.
+- Persistent state strengthens particles, cross-stars and arena glow.
+- Music switches to the pitch-preserved ~15 BPM faster variant at equivalent normalized track progress.
 
-## Podium / post-match flow
+## Podium / post-match
 
-- Final elimination transitions to a synchronized podium scene.
+- Final elimination transitions to synchronized podium.
 - Winner receives one trophy.
-- Gamer tags appear above podium characters.
-- Trophy icon/count appears on the podium base only for players whose trophy count is >0.
-- Winner crown appears beside the gamer tag and persists into the next match.
-- Podium fanfare begins after the podium has visually appeared.
-- After the podium, return directly to the ordinary lobby.
-- All READY states reset. There is no REMATCH button/modal; players press READY normally.
+- Latest winner gets crown beside gamer tag; crown persists into next match.
+- Podium fanfare begins after podium visually appears.
+- After podium, run inactivity cleanup, then return directly to ordinary lobby.
+- READY resets; trophies/crown persist; no REMATCH modal/button.
 
-## Visual system
+## Audio system — V0.9
 
-- Game-controlled text uses the local `Tiles Pixel` font or sprite text treatment.
-- Major controls use stepped pixel geometry rather than smooth modern browser styling.
-- Dynamic names/room codes/counters remain real text semantically but render in the pixel font.
-- Canvas sprite/image smoothing is disabled where applicable.
-- Official Tiles logo remains the approved transparent PNG.
-- Official app icon is the approved character + Tiles-logo icon.
-- Background combines sparse colored shooting streaks with hollow-center four-pixel stars.
-- Desktop and mobile-landscape landing pages retain glowing floating tile/character decorations.
+One persistent Web Audio manager owns the session's output:
 
-## Responsive environments
+`MASTER → MUSIC BUS → normal/final-two sources`
 
-Three deliberate layouts:
+`MASTER → SFX BUS → event sounds + synthesized tones`
 
-1. Desktop
-2. Mobile landscape
-3. Mobile portrait
+Rules:
+- music tuned max is 65% of the previous V0.8 music ceiling;
+- selector wheel tick is approximately 25% stronger than V0.8;
+- user Music and SFX sliders are 0–100, default 100, 5% increments;
+- slider values multiply tuned internal ceilings and persist locally;
+- hidden/background/locked page immediately stops active music/SFX and suspends context;
+- foreground restores only current appropriate music, not missed event sounds;
+- scheduled event SFX are checked against authoritative timestamps to discard stale callbacks;
+- normal/Final Two transition starts destination source before stopping the source already working;
+- watchdog/recovery path restores desired music after browser/iOS interruption;
+- no deliberate Media Session / background-player registration.
 
-A runtime viewport controller uses the visible viewport, orientation, safe-area insets and standalone/PWA state to fit the relevant layout. Essential mobile actions never require page scrolling.
+## Responsive environments — V0.9
+
+Runtime layout modes:
+1. desktop
+2. mobile portrait PWA
+3. mobile portrait browser
+4. mobile landscape PWA
+5. mobile landscape browser
+6. compact landscape PWA/browser variants
+
+Viewport sizing uses `visualViewport`, orientation, standalone detection and safe-area environment values.
+
+Mobile requirements:
+- essential room UI does not require page scrolling;
+- READY / LEAVE receives protected layout space;
+- portrait uses compact header + horizontal player strip + arena + shallow power panel + action row;
+- landscape uses `Power-Up | Arena | Players` + protected action row;
+- decoration/padding/arena size yield before essential controls;
+- safe areas protect Dynamic Island/notch/home indicator and Safari chrome constraints.
+
+## Visual system / icons
+
+- Visible game-controlled text uses `Tiles Pixel` or sprite text treatment.
+- Controls use stepped pixel geometry.
+- Official current Tiles app icon is used for favicon, Apple touch and PWA assets.
+- V0.9 icon paths are cache-busted in HTML/manifest.

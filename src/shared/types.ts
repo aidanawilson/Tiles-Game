@@ -114,4 +114,5 @@ export type ServerMessage =
   | { type: "state"; state: GameState; serverTime: number }
   | { type: "error"; message: string }
   | { type: "pong"; clientTime: number; serverTime: number }
-  | { type: "blocked-destination"; tileId: number; serverTime: number };
+  | { type: "blocked-destination"; tileId: number; serverTime: number }
+  | { type: "removed-inactivity"; serverTime: number };
