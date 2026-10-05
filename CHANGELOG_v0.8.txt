@@ -1,0 +1,34 @@
+TILES v0.8 — FULL PIXEL COMPETITION POLISH
+
+Gameplay / room flow
+- Final-destination occupancy is now the only player blocking rule. Moving characters may continue to cross/slide past each other without recoil or collision state.
+- A human whose final target remains occupied stops one tile short and receives a private double red target flash plus a subtle blocked-destination sound.
+- Bots use the exact same authoritative final-destination rule, without human-only UI feedback.
+- Post-match flow is now podium -> ordinary lobby. The separate REMATCH state/button has been removed; players press READY again.
+- Public Quick Play rooms with zero connected humans are no longer matchmaker-eligible. An explicit last-human leave abandons the room immediately; unexpected disconnects retain reconnect grace.
+- Bot username pool expanded to exactly 250 names: 85 human-style names/variants + 165 arcade/gamer names.
+
+Pixel-art presentation
+- Added local Tiles Pixel bitmap-style font and applied it across dynamic gamer tags, room codes, buttons, tutorial copy, HUD, settings, podium, selector text and inputs.
+- Converted buttons, inputs, panels, toasts and controls to stepped pixel geometry; selector wheel/pointer now use hard pixel silhouettes.
+- Fixed player-card trophy/count spacing.
+- Fixed podium winner animation so it snaps to one sprite frame at a time instead of sliding through the sheet.
+- Pixelated the Apogee Lab mark while retaining its recognizable shape.
+- Official app icon package updated from the approved Tiles character + logo icon.
+
+Audio / feedback
+- Added per-tile mechanical shuffle click synchronized with the left-to-right tile flip wave.
+- Added ceramic break cue for doomed-tile destruction.
+- Added blocked-destination error cue.
+- Added one-shot FINAL TWO swoosh synchronized to the framed fly-through banner.
+- Added podium fanfare, triggered after the podium has visually appeared.
+- Added pitch-preserved Final Two soundtrack variant at roughly +15 BPM and a short crossfade at the equivalent musical position.
+
+Final Two
+- FINAL TWO announcement/swoosh occurs only once per match, on the first transition to exactly two survivors.
+- Persistent Final Two atmosphere remains active afterward: brighter/faster shooting particles, hollow-center pixel stars, stronger arena glow and faster music.
+
+Technical
+- Client/server source typechecks pass using local declaration stubs in this environment.
+- CSS parses successfully.
+- Temporary validation stubs are excluded from the release ZIP.

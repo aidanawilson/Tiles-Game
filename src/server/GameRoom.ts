@@ -3,6 +3,7 @@ import { BASE_STEP_MS, BOARD_RADIUS, BOT_READY_MAX_MS, BOT_READY_MIN_MS, BOT_SEL
 import { encodeServerMessage, parseClientMessage } from "../shared/messages";
 import { PLAYER_COLORS, TILE_COLORS, type ClientMessage, type GameState, type HexTile, type PlayerState, type PowerupState, type PowerupType, type RoomVisibility, type TileColor, } from "../shared/types";
 interface Env {
+    MATCHMAKER: DurableObjectNamespace;
 }
 interface SocketAttachment {
     playerId: string;
@@ -25,7 +26,19 @@ interface StoredRoom {
 const STORAGE_KEY = "room";
 const BOT_PREFIX = ["Nova", "Pixel", "Orbit", "Echo", "Drift", "Neon", "Turbo", "Astro", "Lunar", "Vapor", "Solar", "Kilo", "Mango", "Comet", "Vector", "Rocket", "Hyper", "Static", "Cloud", "Arcade"];
 const BOT_SUFFIX = ["Fox", "Byte", "Jet", "Dash", "Wave", "Bolt", "Cat", "Rider", "Loop", "Nine"];
-const BOT_NAMES = BOT_PREFIX.flatMap((a) => BOT_SUFFIX.map((b) => `${a}${b}`));
+const BOT_HUMAN_NAMES = [
+    "Johnny", "Lucas", "Sarah", "Amy", "Marcus", "Emily", "Jake", "Mia", "Ryan", "Chloe",
+    "Noah", "Olivia", "Ethan", "Ava", "Liam", "Sophia", "Mason", "Emma", "Logan", "Grace",
+    "Caleb", "Lily", "Dylan", "Zoe", "Owen", "Ella", "Carter", "Nora", "Leo", "Maya",
+    "Jack", "Ruby", "Henry", "Lucy", "Ben", "Anna", "Miles", "Claire", "Adam", "Kate",
+    "Alex", "Sam", "Chris", "Taylor", "Jordan", "Casey", "Jamie", "Morgan", "Riley", "Avery",
+    "Amy3", "Jake22", "Lucas7", "Sarah09", "Johnny2", "Mia8", "Ryan11", "Chloe4", "Noah5", "Ava12",
+    "Liam9", "Emma6", "Leo3", "Maya10", "Ben7", "Kate2", "Alex14", "Sam5", "Jordan8", "Riley6",
+    "Nate", "Holly", "Eli", "Jenna", "Luke", "Tessa", "Cole", "Ivy", "Max", "Paige",
+    "Theo", "Lena", "Finn", "Aria", "Dean"
+];
+const BOT_ARCADE_NAMES = BOT_PREFIX.flatMap((a) => BOT_SUFFIX.map((b) => `${a}${b}`)).slice(0, 165);
+const BOT_NAMES = [...BOT_HUMAN_NAMES, ...BOT_ARCADE_NAMES];
 function id(prefix = "id") { return `${prefix}_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`; }
 function randInt(max: number) { const b = new Uint32Array(1); crypto.getRandomValues(b); return max <= 1 ? 0 : b[0] % max; }
 function randBetween(min: number, max: number) { return min + randInt(Math.max(1, max - min + 1)); }
@@ -116,6 +129,7 @@ function emptyState(roomCode: string, visibility: RoomVisibility = "private", bo
         lastWinnerId: null,
         eliminationOrder: [],
         podiumIds: [],
+        finalTwoAnnouncedAt: null,
     };
 }
 function blankMotion(p: PlayerState) { p.destinationTileId = null; p.path = []; p.movingFromTileId = null; p.movingToTileId = null; p.moveStartedAt = null; p.moveEndsAt = null; }
@@ -157,6 +171,7 @@ export class GameRoom extends DurableObject<Env> {
             this.state.lastWinnerId ??= null;
             this.state.eliminationOrder ??= [];
             this.state.podiumIds ??= [];
+            this.state.finalTwoAnnouncedAt ??= null;
             const connectedIds = new Set(this.ctx.getWebSockets().map(s => s.deserializeAttachment() as SocketAttachment | null).filter(Boolean).map(a => a!.playerId));
             for (const p of this.state.players) {
                 p.connected = this.botPlayerIds.has(p.id) || connectedIds.has(p.id);
@@ -183,7 +198,10 @@ export class GameRoom extends DurableObject<Env> {
                 else
                     this.schedulePhase(left, () => this.startCommittedMatch());
             }
-            else if (!["lobby", "game-over"].includes(this.state.phase)) {
+            else if (this.state.phase === "game-over") {
+                this.returnToLobby();
+            }
+            else if (this.state.phase !== "lobby") {
                 for (const p of this.state.players) {
                     p.ready = false;
                     p.alive = true;
@@ -219,7 +237,8 @@ export class GameRoom extends DurableObject<Env> {
             if (!this.created)
                 return Response.json({ exists: false }, { status: 404 });
             const botCount = this.botPlayerIds.size;
-            return Response.json({ exists: true, roomCode: this.roomCode, phase: this.state.phase, players: this.state.players.length, maxPlayers: MAX_PLAYERS, visibility: this.state.room.visibility, botsEnabled: this.state.room.botsEnabled, matchmakingOpen: this.state.room.visibility === "public" && !this.state.room.rosterLocked && ["lobby", "countdown", "game-over"].includes(this.state.phase) && (this.state.players.length < MAX_PLAYERS || botCount > 0) });
+            const connectedHumans = this.connectedHumans().length;
+            return Response.json({ exists: true, roomCode: this.roomCode, phase: this.state.phase, players: this.state.players.length, maxPlayers: MAX_PLAYERS, visibility: this.state.room.visibility, botsEnabled: this.state.room.botsEnabled, connectedHumans, matchmakingOpen: this.state.room.visibility === "public" && connectedHumans > 0 && !this.state.room.rosterLocked && ["lobby", "countdown"].includes(this.state.phase) && (this.state.players.length < MAX_PLAYERS || botCount > 0) });
         }
         if (url.pathname === "/ws") {
             if (!this.created)
@@ -252,7 +271,7 @@ export class GameRoom extends DurableObject<Env> {
             return this.sendError(ws, "Player not found");
         switch (m.type) {
             case "ready":
-                if (["lobby", "game-over"].includes(this.state.phase) && !this.state.room.startCommitted) {
+                if (this.state.phase === "lobby" && !this.state.room.startCommitted) {
                     p.ready = m.ready;
                     this.evaluateLobbyStart();
                 }
@@ -316,7 +335,7 @@ export class GameRoom extends DurableObject<Env> {
             p = this.state.players.find(x => x.id === m.playerId && !this.botPlayerIds.has(x.id));
         if (!p) {
             const replaceable = this.state.room.rosterLocked ? undefined : this.botPlayers().at(-1);
-            const joinablePhase = this.state.phase === "lobby" || this.state.phase === "game-over" || this.state.phase === "countdown";
+            const joinablePhase = this.state.phase === "lobby" || this.state.phase === "countdown";
             if (!joinablePhase) {
                 this.rejectSocket(ws, "A match is already in progress");
                 return;
@@ -357,9 +376,20 @@ export class GameRoom extends DurableObject<Env> {
         }
         ws.serializeAttachment({ playerId: p.id } satisfies SocketAttachment);
         this.closeDuplicateSockets(p.id, ws);
+        // Re-register only after a real human is actually connected. This closes the
+        // small race where a freshly allocated public room could be pruned before its
+        // creator finished the WebSocket handshake. The register endpoint de-dupes.
+        if (this.state.room.visibility === "public") await this.registerPublicRoom();
         await this.persist();
         ws.send(encodeServerMessage({ type: "welcome", playerId: p.id, reconnectToken: this.reconnectTokens[p.id], state: this.publicState(), serverTime: Date.now() }));
         this.broadcastState();
+    }
+    private async registerPublicRoom() {
+        if (this.state.room.visibility !== "public" || !this.connectedHumans().length) return;
+        try {
+            const stub = this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName("GLOBAL"));
+            await stub.fetch(`https://match.internal/register?code=${this.roomCode}`, { method: "POST" });
+        } catch { /* Matchmaking registration is recoverable on the next human hello. */ }
     }
     private newPlayer(playerId: string, name: string, color: PlayerState["color"], tileId: number, host = false): PlayerState { return { id: playerId, name, color, tileId, alive: true, connected: true, ready: false, wins: 0, host, destinationTileId: null, path: [], movingFromTileId: null, movingToTileId: null, moveStartedAt: null, moveEndsAt: null, collisionUntil: null, collisionStartedAt: null, collisionType: null, collisionEventId: null, collisionPartnerId: null, collisionResolveTileId: null, collisionRole: null, powerup: null, invisible: false, invisibilityActivatedAt: null, phaseShiftFromTileId: null, phaseShiftToTileId: null, phaseShiftAt: null, speedBoostUntil: null, bubbleUntil: null }; }
     private ensureBotNamesUnique() { const usedHumans = new Set(this.humanPlayers().map(p => p.name.toLowerCase())); const used = new Set(usedHumans); for (const bot of this.botPlayers()) {
@@ -372,7 +402,7 @@ export class GameRoom extends DurableObject<Env> {
         used.add(bot.name.toLowerCase());
     } }
     private scheduleBotFill(delay: number) {
-        if (!this.state.room.botsEnabled || this.state.room.rosterLocked || !["lobby", "countdown", "game-over"].includes(this.state.phase) || !this.humanPlayers().length)
+        if (!this.state.room.botsEnabled || this.state.room.rosterLocked || !["lobby", "countdown"].includes(this.state.phase) || !this.connectedHumans().length)
             return;
         if (this.botFillTimer && delay !== 0)
             return;
@@ -404,7 +434,7 @@ export class GameRoom extends DurableObject<Env> {
         this.state.players.push(p);
         this.botPlayerIds.add(pid);
         const delay = randBetween(BOT_READY_MIN_MS, BOT_READY_MAX_MS);
-        const timer = setTimeout(() => { this.botTimers.delete(timer); const bot = this.state.players.find(x => x.id === pid); if (bot && ["lobby", "game-over"].includes(this.state.phase) && !this.state.room.startCommitted) {
+        const timer = setTimeout(() => { this.botTimers.delete(timer); const bot = this.state.players.find(x => x.id === pid); if (bot && this.state.phase === "lobby" && !this.state.room.startCommitted) {
             bot.ready = true;
             this.evaluateLobbyStart();
             this.persistSoon();
@@ -415,7 +445,7 @@ export class GameRoom extends DurableObject<Env> {
     private removeBot(pid: string, persist = true) { this.state.players = this.state.players.filter(p => p.id !== pid); this.botPlayerIds.delete(pid); delete this.state.fairness.cycleCounts[pid]; this.state.fairness.doubledPlayers = this.state.fairness.doubledPlayers.filter(x => x !== pid); if (persist)
         this.persistSoon(); }
     private evaluateLobbyStart() {
-        if (this.state.room.startCommitted || !["lobby", "game-over"].includes(this.state.phase))
+        if (this.state.room.startCommitted || this.state.phase !== "lobby")
             return;
         const humans = this.connectedHumans();
         if (!humans.length)
@@ -483,6 +513,7 @@ export class GameRoom extends DurableObject<Env> {
         this.state.fairness = { cycleCounts: {}, doubledPlayers: [] };
         this.state.eliminationOrder = [];
         this.state.podiumIds = [];
+        this.state.finalTwoAnnouncedAt = null;
         this.state.overridePendingPlayerId = null;
         this.state.overrideActivatedAt = null;
         this.botEndgame = { active: false, graceRounds: 1, roundsWithoutElimination: 0, previousGraceRounds: this.botEndgame.previousGraceRounds };
@@ -521,8 +552,12 @@ export class GameRoom extends DurableObject<Env> {
         this.state.previousTiles = null;
         this.state.shuffleStartedAt = null;
         this.state.phase = "pre-round";
-        this.state.phaseEndsAt = Date.now() + PRE_ROUND_COUNTDOWN_MS;
-        this.state.message = this.state.players.filter(p => p.alive).length === 2 ? "FINAL TWO" : "Ready";
+        const now = Date.now();
+        this.state.phaseEndsAt = now + PRE_ROUND_COUNTDOWN_MS;
+        const finalTwo = this.state.players.filter(p => p.alive).length === 2;
+        if (finalTwo && this.state.finalTwoAnnouncedAt == null)
+            this.state.finalTwoAnnouncedAt = now;
+        this.state.message = finalTwo ? "FINAL TWO" : "Ready";
         this.schedulePhase(PRE_ROUND_COUNTDOWN_MS, () => this.beginMovement());
         this.persistSoon();
         this.broadcastState();
@@ -697,21 +732,28 @@ export class GameRoom extends DurableObject<Env> {
         this.state.selectedColor = null;
         this.state.overridePendingPlayerId = null;
         this.state.overrideActivatedAt = null;
-        this.schedulePhase(PODIUM_MS, () => this.enterGameOver());
+        this.schedulePhase(PODIUM_MS, () => this.returnToLobby());
         this.persistSoon();
         this.broadcastState();
     }
-    private enterGameOver() {
-        this.state.phase = "game-over";
+    private returnToLobby() {
+        this.state.phase = "lobby";
         this.state.phaseEndsAt = null;
         this.state.room.rosterLocked = false;
         this.state.room.startCommitted = false;
-        for (const p of this.state.players) {
+        this.state.selectorId = null;
+        this.state.selectorCandidates = [];
+        this.state.selectedColor = null;
+        this.state.powerups = [];
+        this.state.finalTwoAnnouncedAt = null;
+        this.state.previousTiles = null;
+        this.state.shuffleStartedAt = null;
+        this.state.tiles = assignRandomColors(makeHexes(BOARD_RADIUS));
+        this.resetMatchPlayers();
+        for (const p of this.state.players)
             p.ready = false;
-            p.invisible = false;
-            p.invisibilityActivatedAt = null;
-        }
-        if (this.state.room.botsEnabled) {
+        this.state.message = "Waiting for players";
+        if (this.state.room.botsEnabled && this.connectedHumans().length) {
             this.scheduleExistingBotsReady();
             this.scheduleBotFill(PUBLIC_FIRST_BOT_DELAY_MS);
         }
@@ -753,11 +795,10 @@ export class GameRoom extends DurableObject<Env> {
         if (this.state.phase !== "movement")
             return this.stopMovementLoop();
         const now = Date.now();
-        for (const p of this.state.players) {
-            // Normal movement has no player-vs-player collision state in v0.7.
+        for (const p of this.state.players)
             if (p.collisionUntil || p.collisionType)
                 blankCollision(p);
-        }
+
         const due = this.state.players
             .filter(p => p.alive && p.movingToTileId != null && p.moveEndsAt != null && p.moveEndsAt <= now)
             .sort((a, b) => (a.moveEndsAt! - b.moveEndsAt!) || a.id.localeCompare(b.id));
@@ -769,82 +810,73 @@ export class GameRoom extends DurableObject<Env> {
             return;
         }
 
-        // One authoritative winner per target tile. This is the deterministic
-        // "first arrival owns it" rule for simultaneous attempts.
-        const winnerByTarget = new Map<number, PlayerState>();
-        const winnerIds = new Set<string>();
-        for (const p of due) {
-            const target = p.movingToTileId!;
-            if (!winnerByTarget.has(target)) {
-                winnerByTarget.set(target, p);
-                winnerIds.add(p.id);
-            }
-        }
-        const occupantAtStart = new Map<number, PlayerState>();
-        for (const p of this.state.players)
-            if (p.alive)
-                occupantAtStart.set(p.tileId, p);
+        // v0.8 rule: intermediate route cells never collide. Moving characters may
+        // pass/slide through one another. Occupancy is authoritative only when a
+        // player attempts to enter their FINAL requested destination.
+        const dueIds = new Set(due.map(p => p.id));
+        const vacatingThisTick = new Set<number>();
+        for (const mover of due)
+            if (mover.movingToTileId !== mover.tileId)
+                vacatingThisTick.add(mover.tileId);
 
-        const memo = new Map<string, boolean>();
-        const visiting = new Set<string>();
-        const canVacateChain = (p: PlayerState): boolean => {
-            if (memo.has(p.id))
-                return memo.get(p.id)!;
-            if (!winnerIds.has(p.id) || p.movingToTileId == null) {
-                memo.set(p.id, false);
-                return false;
-            }
-            if (visiting.has(p.id))
-                return true; // closed swap/cycle; all members vacate simultaneously.
-            visiting.add(p.id);
-            const occ = occupantAtStart.get(p.movingToTileId);
-            let ok = !occ || occ.id === p.id;
-            if (occ && occ.id !== p.id)
-                ok = canVacateChain(occ);
-            visiting.delete(p.id);
-            memo.set(p.id, ok);
-            return ok;
-        };
+        const claimedFinalTargets = new Set<number>();
+        const successful: PlayerState[] = [];
+        const blockedFinal: Array<{ player: PlayerState; tileId: number }> = [];
 
-        const successful = due.filter(p => winnerIds.has(p.id) && canVacateChain(p));
-        const successfulIds = new Set(successful.map(p => p.id));
-
-        // Apply all normal successful moves together so direct swaps and longer
-        // movement cycles do not see one another as stationary blockers.
-        for (const p of successful)
-            p.tileId = p.movingToTileId!;
-        for (const p of successful) {
-            blankMotionStep(p);
-            this.collectPowerup(p);
-            if (p.destinationTileId === p.tileId)
-                p.destinationTileId = null;
-            this.queueNextStep(p);
-        }
-
-        // Resolve blocked arrivals after normal departures. No power-up bypasses
-        // destination occupancy in v0.7.
-        for (const p of due) {
-            if (successfulIds.has(p.id))
+        for (const mover of due) {
+            const target = mover.movingToTileId!;
+            const isFinalStep = mover.destinationTileId === target;
+            if (!isFinalStep) {
+                successful.push(mover);
                 continue;
-            const target = p.movingToTileId!;
-            blankMotionStep(p);
-            // If this is the final requested tile, stop just outside it. If an
-            // intermediate path cell is occupied, reroute around that cell.
-            if (p.destinationTileId === target) {
-                p.destinationTileId = null;
-                p.path = [];
             }
-            else if (p.destinationTileId != null) {
-                this.recomputePath(p, new Set([target]));
+
+            const occupant = this.state.players.find(other =>
+                other.alive && other.id !== mover.id && other.tileId === target &&
+                !(dueIds.has(other.id) && vacatingThisTick.has(other.tileId))
+            );
+            if (!occupant && !claimedFinalTargets.has(target)) {
+                claimedFinalTargets.add(target);
+                successful.push(mover);
+            } else {
+                blockedFinal.push({ player: mover, tileId: target });
             }
         }
+
+        // Commit successful movement together. This preserves direct swaps and keeps
+        // crossing/intermediate traffic fluid without any bump/recoil state.
+        for (const mover of successful)
+            mover.tileId = mover.movingToTileId!;
+        for (const mover of successful) {
+            blankMotionStep(mover);
+            this.collectPowerup(mover);
+            if (mover.destinationTileId === mover.tileId) {
+                mover.destinationTileId = null;
+                mover.path = [];
+            }
+            this.queueNextStep(mover);
+        }
+
+        // A blocked FINAL destination stops cleanly one tile short. Humans receive a
+        // private red-flash/audio event; bots simply continue with their next normal
+        // waypoint decision. There is deliberately no collision animation.
+        for (const { player, tileId } of blockedFinal) {
+            blankMotionStep(player);
+            player.destinationTileId = null;
+            player.path = [];
+            if (!this.botPlayerIds.has(player.id))
+                this.sendToPlayer(player.id, { type: "blocked-destination", tileId, serverTime: now });
+        }
+
         this.lastTick = now;
+        this.persistSoon();
         this.broadcastState();
     }
+
     private scheduleExistingBotsReady() { for (const bot of this.botPlayers()) {
         bot.ready = false;
         const delay = randBetween(BOT_READY_MIN_MS, BOT_READY_MAX_MS);
-        const t = setTimeout(() => { this.botTimers.delete(t); if (!["lobby", "game-over"].includes(this.state.phase) || this.state.room.startCommitted)
+        const t = setTimeout(() => { this.botTimers.delete(t); if (this.state.phase !== "lobby" || this.state.room.startCommitted)
             return; const current = this.state.players.find(p => p.id === bot.id); if (!current)
             return; current.ready = true; this.persistSoon(); this.broadcastState(); }, delay);
         this.botTimers.add(t);
@@ -859,8 +891,7 @@ export class GameRoom extends DurableObject<Env> {
                     this.botTimers.delete(t);
                     if (this.state.phase !== "movement" || !bot.alive)
                         return;
-                    const blocked = new Set(this.state.players.filter(p => p.alive && p.id !== bot.id).map(p => p.tileId));
-                    let choices = this.state.tiles.filter(x => x.id !== bot.tileId && !blocked.has(x.id) && x.id !== lastTiles.at(-1));
+                    let choices = this.state.tiles.filter(x => x.id !== bot.tileId && x.id !== lastTiles.at(-1));
                     if (!choices.length)
                         return;
                     const dest = choices[randInt(choices.length)];
@@ -1061,9 +1092,23 @@ export class GameRoom extends DurableObject<Env> {
         this.created = false;
         await this.ctx.storage.deleteAll();
         return;
-    } if (this.state.room.startCommitted) { /* countdown intentionally continues */ }
+    }
+    if (this.state.room.visibility === "public" && this.humanPlayers().length === 0) {
+        this.created = false;
+        this.stopMovementLoop();
+        this.clearBotTimers();
+        if (this.phaseTimer) clearTimeout(this.phaseTimer);
+        if (this.botFillTimer) clearTimeout(this.botFillTimer);
+        this.phaseTimer = null;
+        this.botFillTimer = null;
+        this.botPlayerIds.clear();
+        this.state.players = [];
+        await this.ctx.storage.deleteAll();
+        return;
+    }
+    if (this.state.room.startCommitted) { /* countdown intentionally continues */ }
     else
-        this.evaluateLobbyStart(); if (!["lobby", "game-over", "countdown", "podium"].includes(this.state.phase)) {
+        this.evaluateLobbyStart(); if (!["lobby", "countdown", "podium"].includes(this.state.phase)) {
         const alive = this.state.players.filter(x => x.alive);
         if (wasAlive && alive.length <= 1)
             this.finishMatch();
@@ -1076,7 +1121,21 @@ export class GameRoom extends DurableObject<Env> {
         delete this.disconnectedAt[x];
         delete this.reconnectTokens[x];
         delete this.state.fairness.cycleCounts[x];
-    } if (!this.state.players.length) {
+    }
+    if (this.state.room.visibility === "public" && this.humanPlayers().length === 0) {
+        this.created = false;
+        this.stopMovementLoop();
+        this.clearBotTimers();
+        if (this.phaseTimer) clearTimeout(this.phaseTimer);
+        if (this.botFillTimer) clearTimeout(this.botFillTimer);
+        this.phaseTimer = null;
+        this.botFillTimer = null;
+        this.botPlayerIds.clear();
+        this.state.players = [];
+        await this.ctx.storage.deleteAll();
+        return;
+    }
+    if (!this.state.players.length) {
         this.created = false;
         if (notify)
             await this.ctx.storage.deleteAll();
@@ -1111,6 +1170,14 @@ export class GameRoom extends DurableObject<Env> {
         }
         catch { }
     } }
+    private sendToPlayer(playerId: string, message: import("../shared/types").ServerMessage) {
+        const payload = encodeServerMessage(message);
+        for (const socket of this.ctx.getWebSockets()) {
+            if ((socket.deserializeAttachment() as SocketAttachment | null)?.playerId !== playerId)
+                continue;
+            try { socket.send(payload); } catch { }
+        }
+    }
     private sendError(ws: WebSocket, message: string) { try {
         ws.send(encodeServerMessage({ type: "error", message }));
     }

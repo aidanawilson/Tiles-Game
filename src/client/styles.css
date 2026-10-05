@@ -258,3 +258,114 @@ html[data-tiles-layout="mobile-portrait"] .podium-scene{height:76%;width:96%;gap
 .podium-scene{animation:podium-scene-visibility 3.6s ease both}
 @keyframes podium-scene-visibility{0%,8%{opacity:0;transform:scale(.985)}14%,84%{opacity:1;transform:scale(1)}92%,100%{opacity:0;transform:scale(.99)}}
 html[data-tiles-layout="mobile-landscape"] .winner-overlay .rematch-button,html[data-tiles-layout="mobile-portrait"] .winner-overlay .rematch-button{display:none}
+
+/* ========================================================================== */
+/* v0.8 FULL PIXEL PRESENTATION + AUDIO/VISUAL POLISH                         */
+/* ========================================================================== */
+@font-face{font-family:"Tiles Pixel";src:url('/fonts/tiles-pixel.woff2') format('woff2');font-weight:100 1000;font-style:normal;font-display:swap}
+:root{font-family:"Tiles Pixel",monospace!important}
+*,*::before,*::after{font-family:"Tiles Pixel",monospace!important;font-synthesis:none!important}
+button,input,select,textarea{font-family:"Tiles Pixel",monospace!important;border-radius:0!important}
+input::placeholder{font-family:"Tiles Pixel",monospace!important;opacity:.55}
+
+/* Hard-edged reusable pixel component language. */
+.arcade-button,.big-action,.leave-button,.resume-button,.secondary-action,.settings-popover button,.segmented button,.bot-toggle button,.room-copy,.power-card,.color-grid button,.settings-button,.install-toggle,.create-options,.toast,.connection-strip,.drop-callout,.result-callout,.spectator-badge,.phase-timer-frame,.choice-timer-frame,.color-popup{
+  border-radius:0!important;
+  clip-path:polygon(6px 0,calc(100% - 6px) 0,100% 6px,100% calc(100% - 6px),calc(100% - 6px) 100%,6px 100%,0 calc(100% - 6px),0 6px);
+}
+.arcade-button,.big-action,.leave-button,.resume-button,.secondary-action,.settings-popover button,.segmented button,.bot-toggle button{transition:none!important;box-shadow:4px 4px 0 #020409,0 0 0 2px rgba(255,216,104,.1)!important}
+.arcade-button:active,.big-action:active,.leave-button:active,.resume-button:active,.secondary-action:active,.settings-popover button:active{transform:translate(2px,2px);box-shadow:2px 2px 0 #020409!important}
+.ornate-frame,.landing-panel,.tutorial-card,.arcade-panel,.arena-frame,.arcade-header{border-radius:0!important}
+
+/* Player stats: trophy and score own a reserved, non-overlapping cluster. */
+.player-card-copy{min-width:0;overflow:hidden}
+.player-card{grid-template-columns:42px minmax(0,1fr) 50px!important}
+.player-trophies{width:46px!important;min-width:46px!important;height:24px!important;display:grid!important;grid-template-columns:18px 24px!important;align-items:center!important;justify-content:end!important;column-gap:4px!important;overflow:visible!important}
+.player-trophies>img{width:18px!important;height:18px!important;object-fit:contain!important;transform:none!important;margin:0!important}
+.player-trophies .pixel-count{transform:scale(.32)!important;transform-origin:left center!important;margin:0!important;width:27px!important;overflow:visible!important}
+html[data-tiles-layout="mobile-landscape"] .player-card{grid-template-columns:27px minmax(0,1fr) 35px!important}
+html[data-tiles-layout="mobile-landscape"] .player-trophies{width:34px!important;min-width:34px!important;grid-template-columns:13px 18px!important;column-gap:2px!important}
+html[data-tiles-layout="mobile-landscape"] .player-trophies>img{width:13px!important;height:13px!important}
+html[data-tiles-layout="mobile-landscape"] .player-trophies .pixel-count{transform:scale(.22)!important}
+html[data-tiles-layout="mobile-portrait"] .player-trophies{display:none!important}
+
+/* Podium sprite atlas must snap to exact source frames; never interpolate. */
+.podium-character{background-size:400% 800%!important;background-position-y:0!important;image-rendering:pixelated!important}
+.podium-winner .podium-character{animation:podium-dance-v08 .72s steps(1,end) infinite!important}
+@keyframes podium-dance-v08{
+  0%,24.99%{background-position-x:0%;transform:translateY(0) rotate(-2deg)}
+  25%,49.99%{background-position-x:33.333333%;transform:translateY(-7px) rotate(1deg)}
+  50%,74.99%{background-position-x:66.666667%;transform:translateY(-3px) rotate(2deg)}
+  75%,100%{background-position-x:100%;transform:translateY(0) rotate(-1deg)}
+}
+.podium-trophies{min-width:54px;display:grid!important;grid-template-columns:22px 28px!important;gap:5px!important;align-items:center!important;justify-content:center!important;overflow:visible!important}
+.podium-trophies img{width:22px!important;height:22px!important;margin:0!important}
+.podium-trophies .pixel-count{transform:scale(.36)!important;transform-origin:left center!important;margin:0!important;width:28px!important}
+
+/* Two particle families: shooting pixels + hollow-center four-pixel stars. */
+.particle-field .shooting-pixel{position:absolute;top:var(--particle-top);left:var(--particle-left);width:var(--particle-length);height:2px;background:linear-gradient(90deg,transparent,var(--particle-color) 55%,#fff 100%);box-shadow:0 0 6px color-mix(in srgb,var(--particle-color) 60%,transparent);opacity:0;transform:rotate(var(--particle-angle));animation:shooting-pixel var(--particle-duration) linear infinite;animation-delay:var(--particle-delay)}
+.particle-field .pixel-star{position:absolute!important;top:var(--star-top)!important;left:var(--star-left)!important;width:3px!important;height:3px!important;background:var(--star-color)!important;box-shadow:0 -4px 0 var(--star-color),0 4px 0 var(--star-color),-4px 0 0 var(--star-color),4px 0 0 var(--star-color),0 0 5px color-mix(in srgb,var(--star-color) 55%,transparent)!important;opacity:.3;transform:none!important;animation:pixel-star-drift var(--star-duration) linear infinite!important;animation-delay:var(--star-delay)!important;border-radius:0!important}
+@keyframes pixel-star-drift{0%{translate:-14vw 12vh;opacity:0}10%{opacity:.42}45%{scale:1}52%{scale:1.45;opacity:.78}58%{scale:1}90%{opacity:.34}100%{translate:116vw -10vh;opacity:0}}
+html[data-final-two="yes"] .particle-field .shooting-pixel{filter:brightness(1.55)!important;height:3px!important;animation-duration:calc(var(--particle-duration) * .58)!important;opacity:.7}
+html[data-final-two="yes"] .particle-field .pixel-star{filter:brightness(1.45);animation-duration:calc(var(--star-duration) * .55)!important;opacity:.68!important}
+html[data-final-two="yes"] .particle-field::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 45%,rgba(255,204,76,.035) 76%,transparent 100%);animation:final-two-aura 1.1s steps(4,end) infinite}
+@keyframes final-two-aura{50%{opacity:.45}}
+
+/* FINAL TWO is one-shot: framed fly-through synchronized to the swoosh. */
+.final-two-announcement-frame{position:absolute;z-index:45;left:50%;top:42%;width:min(390px,68%);min-height:78px;display:grid;place-items:center;padding:10px 20px;background:linear-gradient(#16130c,#080a0d);border:4px solid #f1bc4b;box-shadow:0 0 0 3px #704515,7px 7px 0 #020409,0 0 24px rgba(255,196,73,.28);clip-path:polygon(15px 0,calc(100% - 15px) 0,calc(100% - 15px) 6px,100% 6px,100% calc(100% - 6px),calc(100% - 15px) calc(100% - 6px),calc(100% - 15px) 100%,15px 100%,15px calc(100% - 6px),0 calc(100% - 6px),0 6px,15px 6px);animation:final-two-fly 1.56s steps(18,end) both}
+.final-two-announcement-frame::before,.final-two-announcement-frame::after{content:"";position:absolute;top:50%;width:18px;height:18px;background:#f6cf65;box-shadow:0 -7px 0 #9a6420,0 7px 0 #9a6420;transform:translateY(-50%) rotate(45deg)}
+.final-two-announcement-frame::before{left:-11px}.final-two-announcement-frame::after{right:-11px}
+.final-two-announcement-frame .final-two-banner{width:88%!important;animation:none!important}
+@keyframes final-two-fly{0%{opacity:0;transform:translate(-130%,-50%) scaleX(.55)}18%{opacity:1;transform:translate(-50%,-50%) scaleX(1)}61%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(48%,-50%) scaleX(.9)}}
+.final-two-arena{box-shadow:0 0 0 3px #6b4619,0 0 0 5px rgba(255,224,126,.18),0 0 46px rgba(255,191,54,.42),inset 0 0 28px rgba(255,215,82,.1)!important}
+
+/* Removed rematch state: podium returns straight to ordinary lobby. */
+.winner-overlay,.rematch-button{display:none!important}
+
+/* Pixel-form inputs: semantic native fields remain, but no browser visual style leaks through. */
+input{appearance:none!important;-webkit-appearance:none!important;background:#050b13!important;color:#fff3c5!important;caret-color:#ffd95c!important;outline:none!important;border:3px solid #d7a745!important;box-shadow:inset 0 0 0 2px #132033,4px 4px 0 #020409!important;clip-path:polygon(5px 0,calc(100% - 5px) 0,100% 5px,100% calc(100% - 5px),calc(100% - 5px) 100%,5px 100%,0 calc(100% - 5px),0 5px)!important}
+input:focus{border-color:#65c7ff!important;box-shadow:inset 0 0 0 2px #153b55,4px 4px 0 #020409,0 0 12px rgba(88,192,255,.2)!important}
+
+/* Pixel frame refinement: no smooth rounded browser geometry. */
+.room-copy{border-radius:0!important;clip-path:polygon(6px 0,calc(100% - 6px) 0,100% 6px,100% calc(100% - 6px),calc(100% - 6px) 100%,6px 100%,0 calc(100% - 6px),0 6px)!important}
+.selector-wheel,.selector-wheel::after{image-rendering:pixelated;border-radius:50%; /* circular gameplay wheel remains intentionally circular */}
+.apogee-link img,.tiles-logo img,.power-sprite,.settings-button img,.player-card img,.podium-character,.podium-crown,.name-crown{image-rendering:pixelated!important}
+
+/* Native-browser compactness: pixel glyphs get tighter rather than overflowing. */
+html[data-tiles-layout="mobile-landscape"] body,html[data-tiles-layout="mobile-portrait"] body{letter-spacing:-.01em}
+html[data-tiles-layout="mobile-landscape"] .panel-heading,html[data-tiles-layout="mobile-landscape"] .player-card b,html[data-tiles-layout="mobile-landscape"] .player-card small{letter-spacing:0!important}
+
+/* The old generic particle nth-child rules should only target shooting streaks. */
+html[data-tiles-layout="mobile-landscape"] .particle-field .shooting-pixel:nth-of-type(n+17),html[data-tiles-layout="mobile-portrait"] .particle-field .shooting-pixel:nth-of-type(n+12){display:none}
+html[data-tiles-layout="mobile-landscape"] .particle-field .pixel-star:nth-of-type(n+13),html[data-tiles-layout="mobile-portrait"] .particle-field .pixel-star:nth-of-type(n+9){display:none}
+html[data-tiles-layout="mobile-landscape"] .particle-field .pixel-star,html[data-tiles-layout="mobile-portrait"] .particle-field .pixel-star{display:block}
+html[data-tiles-layout="mobile-landscape"] .particle-field .pixel-star:nth-of-type(n+13),html[data-tiles-layout="mobile-portrait"] .particle-field .pixel-star:nth-of-type(n+9){display:none}
+
+/* V0.8 selector wheel: keep the gameplay wheel, but render its silhouette and pointer as hard pixel geometry. */
+.selector-wheel{
+  border-radius:0!important;
+  clip-path:polygon(38% 0,62% 0,62% 2%,76% 2%,76% 7%,86% 7%,86% 14%,93% 14%,93% 24%,98% 24%,98% 38%,100% 38%,100% 62%,98% 62%,98% 76%,93% 76%,93% 86%,86% 86%,86% 93%,76% 93%,76% 98%,62% 98%,62% 100%,38% 100%,38% 98%,24% 98%,24% 93%,14% 93%,14% 86%,7% 86%,7% 76%,2% 76%,2% 62%,0 62%,0 38%,2% 38%,2% 24%,7% 24%,7% 14%,14% 14%,14% 7%,24% 7%,24% 2%,38% 2%)!important;
+  border:9px solid #d2a847!important;
+  filter:drop-shadow(6px 7px 0 #040609) drop-shadow(0 0 9px rgba(255,210,88,.2));
+}
+.selector-wheel::after{
+  border-radius:0!important;
+  clip-path:polygon(30% 0,70% 0,70% 8%,88% 8%,88% 30%,100% 30%,100% 70%,88% 70%,88% 92%,70% 92%,70% 100%,30% 100%,30% 92%,12% 92%,12% 70%,0 70%,0 30%,12% 30%,12% 8%,30% 8%)!important;
+  border-color:#d6ad4a!important;
+}
+.wheel-pointer{
+  font-size:0!important;
+  width:28px!important;
+  height:20px!important;
+  transform:translateY(9px)!important;
+  filter:drop-shadow(2px 2px 0 #000);
+}
+.wheel-pointer::before{
+  content:"";
+  display:block;
+  width:4px;
+  height:4px;
+  margin-left:2px;
+  background:#fff2b5;
+  box-shadow:5px 0 0 #fff2b5,10px 0 0 #fff2b5,15px 0 0 #fff2b5,20px 0 0 #fff2b5,5px 5px 0 #fff2b5,10px 5px 0 #fff2b5,15px 5px 0 #fff2b5,10px 10px 0 #fff2b5;
+}

@@ -96,6 +96,7 @@ export interface GameState {
   lastWinnerId: string | null;
   eliminationOrder: string[];
   podiumIds: string[];
+  finalTwoAnnouncedAt: number | null;
 }
 
 export type ClientMessage =
@@ -112,4 +113,5 @@ export type ServerMessage =
   | { type: "welcome"; playerId: string; reconnectToken: string; state: GameState; serverTime: number }
   | { type: "state"; state: GameState; serverTime: number }
   | { type: "error"; message: string }
-  | { type: "pong"; clientTime: number; serverTime: number };
+  | { type: "pong"; clientTime: number; serverTime: number }
+  | { type: "blocked-destination"; tileId: number; serverTime: number };

@@ -1,5 +1,5 @@
-Tiles V0.7 file inventory
-=========================
+TILES V0.8 FILE INVENTORY
+Generated: 2026-10-04
 
 .github/workflows/ci.yml
 .gitignore
@@ -9,6 +9,7 @@ CHANGELOG_v0.5.3.txt
 CHANGELOG_v0.5.txt
 CHANGELOG_v0.6.txt
 CHANGELOG_v0.7.txt
+CHANGELOG_v0.8.txt
 FILE_INVENTORY.txt
 GAME_SPEC.md
 README.md
@@ -18,14 +19,14 @@ art-reference/a_clean_high_resolution_game_asset_sprite_sheet_o.png
 art-reference/a_clean_pixel_art_game_design_presentation_image_o.png
 art-reference/apogee-lab-logo-source.png
 art-reference/final-tiles-logo-source.png
-art-reference/mobile/IMG_3385.jpeg
-art-reference/mobile/IMG_3386.jpeg
-art-reference/mobile/IMG_3387.png
-art-reference/mobile/IMG_3388.jpeg
 art-reference/mobile-layout-3390.jpeg
 art-reference/mobile-layout-3391.jpeg
 art-reference/mobile-layout-3392.jpeg
 art-reference/mobile-layout-3393.jpeg
+art-reference/mobile/IMG_3385.jpeg
+art-reference/mobile/IMG_3386.jpeg
+art-reference/mobile/IMG_3387.png
+art-reference/mobile/IMG_3388.jpeg
 art-reference/native-browser-3394.jpeg
 art-reference/native-browser-3395.jpeg
 art-reference/neon_color_drop_arena.png
@@ -34,10 +35,12 @@ art-reference/neon_green_chibi_robot_sprite_sheet.png
 art-reference/neon_pixel_robot_sprite_sheet.png
 art-reference/neon_pixel_selector_wheel_system.png
 art-reference/neon_tiles_arcade_lobby.png
+art-reference/official-app-icon.png
 art-reference/pixel_robot_animation_sprite_sheet.png
 art-reference/player-panel-reference.jpeg
 art-reference/retro_robot_ghost_sprite_sheet.png
 index.html
+licenses/V0.8_AUDIO_NOTES.md
 licenses/retro-arcade-theme-license.png
 package.json
 public/assets/apogee-lab-logo.png
@@ -52,8 +55,8 @@ public/assets/characters/thumbs/red.png
 public/assets/characters/thumbs/yellow.png
 public/assets/characters/yellow.png
 public/assets/powerups.png
-public/assets/tiles/hex-atlas.png
 public/assets/tiles-logo.png
+public/assets/tiles/hex-atlas.png
 public/assets/ui/crown.png
 public/assets/ui/final-two.png
 public/assets/ui/gear.png
@@ -61,17 +64,26 @@ public/assets/ui/go.png
 public/assets/ui/override.png
 public/assets/ui/pixel-digits.png
 public/assets/ui/ready.png
-public/assets/ui/rematch.png
 public/assets/ui/trophy.png
+public/audio/retro-arcade-theme-final-two.mp3
 public/audio/retro-arcade-theme.mp3
+public/audio/sfx/blocked-destination.mp3
+public/audio/sfx/final-two-swoosh.mp3
+public/audio/sfx/podium-fanfare.mp3
+public/audio/sfx/tile-break.mp3
+public/audio/sfx/tile-flip-click.mp3
+public/fonts/tiles-pixel.ttf
+public/fonts/tiles-pixel.woff2
 public/icons/apple-touch-icon.png
+public/icons/favicon-16.png
+public/icons/favicon-32.png
 public/icons/favicon.ico
 public/icons/icon-192.png
 public/icons/icon-512.png
 public/icons/icon-64.png
-public/icons/icon.svg
 public/manifest.webmanifest
 src/client/App.tsx
+src/client/audio.ts
 src/client/game/GameCanvas.tsx
 src/client/game/hex.ts
 src/client/main.tsx

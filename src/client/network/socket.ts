@@ -2,11 +2,13 @@ import type { ClientMessage, GameState, ServerMessage } from "../../shared/types
 type StateListener = (state: GameState, serverTime: number) => void;
 type ErrorListener = (message: string) => void;
 type ConnectionListener = (status: "connecting" | "connected" | "reconnecting" | "closed") => void;
+type BlockedDestinationListener = (tileId: number, serverTime: number) => void;
 export class RoomSocket {
     private ws: WebSocket | null = null;
     private stateListeners = new Set<StateListener>();
     private errorListeners = new Set<ErrorListener>();
     private connectionListeners = new Set<ConnectionListener>();
+    private blockedDestinationListeners = new Set<BlockedDestinationListener>();
     private closedByUser = false;
     private reconnectTimer: number | null = null;
     private reconnectAttempt = 0;
@@ -57,6 +59,7 @@ export class RoomSocket {
     onState(listener: StateListener) { this.stateListeners.add(listener); return () => this.stateListeners.delete(listener); }
     onError(listener: ErrorListener) { this.errorListeners.add(listener); return () => this.errorListeners.delete(listener); }
     onConnection(listener: ConnectionListener) { this.connectionListeners.add(listener); return () => this.connectionListeners.delete(listener); }
+    onBlockedDestination(listener: BlockedDestinationListener) { this.blockedDestinationListeners.add(listener); return () => this.blockedDestinationListeners.delete(listener); }
     send(message: ClientMessage) { if (this.ws?.readyState === WebSocket.OPEN)
         this.ws.send(JSON.stringify(message)); }
     private handleMessage(raw: string) {
@@ -79,6 +82,10 @@ export class RoomSocket {
         }
         if (message.type === "state") {
             this.stateListeners.forEach((listener) => listener(message.state, message.serverTime));
+            return;
+        }
+        if (message.type === "blocked-destination") {
+            this.blockedDestinationListeners.forEach((listener) => listener(message.tileId, message.serverTime));
             return;
         }
         if (message.type === "error")

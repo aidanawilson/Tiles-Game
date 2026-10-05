@@ -22,24 +22,21 @@ export class Matchmaker extends DurableObject<Env> {
             const rooms = await this.ctx.storage.get<string[]>(ROOMS_KEY) ?? [];
             const shuffled = [...rooms].sort(() => Math.random() - .5);
             const keep: string[] = [];
+            let openRoom: string | null = null;
             for (const code of shuffled) {
                 try {
                     const r = await this.roomStub(code).fetch("https://room.internal/status");
-                    if (!r.ok)
-                        continue;
-                    const s = await r.json() as {
-                        visibility?: string;
-                        matchmakingOpen?: boolean;
-                    };
-                    if (s.visibility === "public")
-                        keep.push(code);
-                    if (s.visibility === "public" && s.matchmakingOpen) {
-                        await this.ctx.storage.put(ROOMS_KEY, keep.concat(rooms.filter(x => !keep.includes(x) && x !== code)).slice(-120));
-                        return Response.json({ roomCode: code, created: false });
-                    }
-                }
-                catch { }
+                    if (!r.ok) continue;
+                    const status = await r.json() as { visibility?: string; matchmakingOpen?: boolean; connectedHumans?: number };
+                    // Zero-human public rooms are stale/abandoned for matchmaking.
+                    if (status.visibility !== "public" || (status.connectedHumans ?? 0) <= 0) continue;
+                    keep.push(code);
+                    if (!openRoom && status.matchmakingOpen) openRoom = code;
+                } catch { }
             }
+            await this.ctx.storage.put(ROOMS_KEY, keep.slice(-120));
+            if (openRoom)
+                return Response.json({ roomCode: openRoom, created: false });
             for (let i = 0; i < 16; i++) {
                 const code = randomRoomCode();
                 const r = await this.roomStub(code).fetch(`https://room.internal/create?code=${code}&visibility=public&bots=1&quick=1`, { method: "POST" });

@@ -1,6 +1,8 @@
-# Tiles V0.7 — Sensory Arcade Update
+# Tiles V0.8 — Full Pixel Competition Polish
 
-Tiles is a realtime multiplayer browser party game by Apogee Lab. V0.7 focuses on the part of the project that makes a simple rule set feel like a finished game: readable timing, strategic powerups, satisfying between-round rhythm, stronger endgame presentation, and a faster rematch loop.
+Tiles is a realtime multiplayer pixel-arcade survival game by **Apogee Lab**. Players move across a 19-cell hex arena, then one player chooses a tile color to eliminate. The last character standing wins.
+
+V0.8 is a competition-polish pass: gameplay feedback is cleaner, abandoned Quick Play rooms cannot trap new players in stale bot matches, the endgame has stronger audiovisual escalation, and the visible interface has been unified around a custom pixel-art language.
 
 ## Stack
 
@@ -9,71 +11,73 @@ Tiles is a realtime multiplayer browser party game by Apogee Lab. V0.7 focuses o
 - Cloudflare Worker
 - one `GameRoom` Durable Object per room
 - one global `Matchmaker` Durable Object
-- WebSockets and server-authoritative game state
-- no D1 required for live matches
+- WebSockets with server-authoritative game state
+- no D1 required for active matches
 
-## V0.7 highlights
+## Core match loop
 
-### Strategic powerups
+`board flip → pre-round cue → 7.0 s movement → selector wheel → 5.0 s color choice → 1.65 s reveal/reaction → tile break/drop → results`
 
-The powerup set is now **Invisibility / Override / Phase Shift**.
+Powerups are **Invisibility / Override / Phase Shift**:
 
-- **Invisibility** hides the player's arena position from every other client for the rest of the round. The owner still sees a translucent/glitching self representation.
-- **Override** guarantees its owner is the next selector. At most one Override can exist across the board, inventories, or pending selector state at any time.
-- **Phase Shift** remains the emergency doomed-tile escape and now has a 1.65-second reaction window plus source/destination lightning effects.
-- Click/tap activates a legal held powerup; desktop players may also press **Space**.
+- **Invisibility** hides the user's arena position from other clients for the rest of the round while leaving a translucent self-view.
+- **Override** is globally unique and guarantees its owner becomes the next selector.
+- **Phase Shift** teleports a threatened player to a safe tile during the reveal window.
 
-### Round cadence
+Click/tap activates a legal held powerup; desktop players may also press **Space**.
 
-A round now has explicit punctuation:
+## V0.8 highlights
 
-`shuffle → pre-round countdown → 7.0 s movement → selector wheel → 5.0 s color choice → 1.65 s reveal → results`
+### Cleaner movement feedback
 
-- movement and color-choice timers use a custom sprite-digit atlas and show tenths of a second
-- the pre-round sequence uses three short countdown tones followed by a brighter GO tone
-- supported devices receive matching light haptic cues
-- the board performs a left-to-right flip wave between rounds, with a tiny landing bounce and a damped mechanical click on each tile
+Moving characters may cross/slide past one another without server collision or recoil. Occupancy matters only at the player's **final selected destination**. If that destination is still occupied on arrival, the server stops the player on the previous valid tile. Humans receive a private red target flash and subtle error sound; bots use the same authoritative rule without client feedback.
 
-### Selector / elimination polish
+### Quick Play always starts from a live human room
 
-- selector wheel uses a longer final deceleration without turning the phase into dead time
-- wedge crossings receive light ticks and the final landing receives a stronger clunk
-- the selected player's card pulses at the actual landing moment
-- Override's electric-blue wheel treatment appears only to the player who used Override
-- doomed characters use a panic/fall pose and descend with the tile instead of disappearing abruptly
+A public room with zero connected humans is not eligible for Quick Play. An explicit last-human leave abandons the room immediately; unexpected disconnects retain the reconnect grace period. If no live human public room exists, Quick Play creates a fresh room.
 
-### Final Two and victory loop
+### 250-name bot identity pool
 
-- at two survivors, `FINAL TWO` flashes during the existing pre-round countdown
-- background particles intensify slightly and the arena frame receives a stronger glow
-- the match ends in a full-screen pixel-art podium scene with a ~300 ms transition, about three seconds of presentation, trophy counts on podium bases, and a winner dance
-- the most recent winner receives the small gold crown beside their gamer tag; it remains through the next match until another player wins
-- the post-match action is a clear **REMATCH?** prompt while the room and session trophy totals remain intact
+Bots draw from exactly **250 preset names**: 85 human-style names/variants and 165 arcade/gamer names. Visible names remain unique within a room and never receive a BOT label.
 
-### Smarter bot-only endgames
+### Full pixel presentation
 
-When no real human remains alive, a hidden pacing governor prevents endless bot stalemates without secretly moving bots.
+V0.8 ships a local **Tiles Pixel** bitmap-style font and uses it throughout the UI, including dynamic gamer tags, room codes, tutorial copy, buttons, settings, HUD labels, selector text and podium values. Inputs remain semantic browser controls underneath, but their visible treatment is pixel-art styled.
 
-- a grace interval of 1–3 natural rounds is rolled after entering bot-only play and after every bot elimination
-- two grace intervals of 3 can never occur consecutively
-- once the grace interval expires, bot selectors prefer a color occupied by exactly one opponent, otherwise the least-populated opponent color
-- bots never intentionally select their own current tile color
-- if no legal opponent target exists, the bot makes a normal safe choice and the forced-progress requirement carries forward
-- normal 0.75–2.5 second bot decision delay is preserved
+Buttons, cards, panels, toasts, selector components and settings controls use stepped pixel geometry, hard shadows and nearest-neighbor scaling. The selector wheel and pointer also use hard pixel silhouettes rather than smooth round browser UI.
 
-### Home-screen settings
+### Final Two escalation
 
-The old persistent sound button is replaced by a small home-screen settings control for:
+The first transition to exactly two survivors triggers a one-shot framed **FINAL TWO** fly-through banner with a synchronized swoosh. It does not repeat if both players survive the next round.
 
-- Music
-- Sound Effects
-- Haptics (only where the browser exposes vibration support)
+The Final Two atmosphere then persists until match end:
 
-Preferences are stored locally.
+- higher-density/brighter shooting particles
+- hollow-center cross-shaped pixel stars
+- stronger arena-frame glow
+- a pitch-preserved soundtrack variant running roughly **15 BPM faster**
 
-## Preserved systems
+The normal and Final Two tracks crossfade at approximately the equivalent musical position rather than restarting from the beginning.
 
-V0.7 retains the V0.6 occupancy movement model, local destination glow, public Quick Play, private/public groups, staged bot filling, human-over-bot replacement, committed start countdown, selector fairness, responsive desktop/mobile-landscape/mobile-portrait layouts, `visualViewport` fitting, safe-area handling, background particles, ornamental frames, room-code copy behavior, reconnect identities, and session trophy counts.
+### New sound pass
+
+- a soft mechanical click follows each tile in the left-to-right board-flip wave
+- one ceramic break cue accompanies the doomed-color fracture/drop
+- blocked final destinations receive a private error cue
+- Final Two receives a one-shot swoosh
+- the podium fanfare begins after the podium has visually appeared
+
+All effects obey the **Sound FX** setting. Music and haptics remain separately configurable on the home screen.
+
+### Podium and lobby flow
+
+The podium still presents the top finishers, trophy totals and newest winner crown, but the winner sprite animation now snaps cleanly between atlas frames instead of sliding through the sheet. Trophy icons/counts have dedicated spacing.
+
+After the podium, the room returns directly to the ordinary lobby. There is no REMATCH modal or special rematch button; every player simply presses **READY** again.
+
+## Official app icon
+
+The PWA/favicon package uses the approved Tiles character + Tiles logo icon in 512, 192, Apple-touch, 64, 32, 16 and ICO variants.
 
 ## Cloudflare build settings
 
@@ -93,4 +97,8 @@ npm run check
 npm run dev
 ```
 
-The GitHub/Cloudflare production pipeline is the final dependency/build verification. This source package was also checked with strict TypeScript compiler passes using local declaration stubs because package-registry access was unavailable in the build environment that produced the ZIP.
+The source was validated with strict client/server/node TypeScript passes using temporary local declaration stubs and a CSS parse check. Those validation stubs are not included in the release package. Package-registry access was unavailable in the environment that produced the ZIP, so the GitHub/Cloudflare pipeline remains the final fresh dependency + Vite production-build verification.
+
+## Audio licensing note
+
+The V0.8 SFX source files were supplied by the project owner. This repository intentionally does not invent license terms for those files. See `licenses/V0.8_AUDIO_NOTES.md` and retain/verify the applicable source-page licenses before public distribution or contest submission.
